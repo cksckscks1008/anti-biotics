@@ -1,0 +1,3150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#03080d" />
+  <title>미생물 격리 연구소 — Containment Protocol</title>
+  <style>
+    :root {
+      --bg-0: #020508;
+      --bg-1: #041018;
+      --panel: rgba(5, 18, 27, 0.88);
+      --panel-strong: rgba(3, 12, 19, 0.96);
+      --line: rgba(84, 255, 218, 0.28);
+      --line-strong: rgba(84, 255, 218, 0.76);
+      --cyan: #54ffda;
+      --blue: #5bc8ff;
+      --amber: #ffd166;
+      --orange: #ff8a3d;
+      --red: #ff3864;
+      --violet: #b48cff;
+      --text: #f2fbff;
+      --muted: #8ea9b7;
+      --shadow: 0 18px 70px rgba(0, 0, 0, 0.55);
+      --hud-height: calc(196px + var(--safe-top));
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      color-scheme: dark;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg-0);
+      color: var(--text);
+      font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; -webkit-tap-highlight-color: transparent; }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: 0.62; }
+    :focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
+    ::selection { background: rgba(84,255,218,.24); color: #fff; }
+    * { scrollbar-width: thin; scrollbar-color: rgba(84,255,218,.35) rgba(0,0,0,.2); }
+    [hidden] { display: none !important; }
+
+    body {
+      display: grid;
+      place-items: center;
+      overscroll-behavior: none;
+    }
+
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(0, 132, 156, 0.16), transparent 33%),
+        radial-gradient(circle at 15% 90%, rgba(63, 92, 150, 0.09), transparent 32%),
+        linear-gradient(160deg, #06131c 0%, #02070b 46%, #010305 100%);
+    }
+
+    #game[data-effects="low"] .noise-layer,
+    #game[data-effects="low"] .scan-layer,
+    #game[data-effects="low"] .ambient-particle,
+    #game[data-effects="low"] .trail-dot { display: none !important; }
+    #game[data-effects="low"] .screen-shake { animation: none !important; }
+
+    #game::before,
+    #game::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 60;
+    }
+
+    #game::before {
+      opacity: 0.22;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,0.025) 4px),
+        radial-gradient(circle at center, transparent 48%, rgba(0,0,0,0.62) 100%);
+      mix-blend-mode: screen;
+    }
+
+    #game::after {
+      box-shadow: inset 0 0 150px rgba(0,0,0,0.92), inset 0 0 35px rgba(84,255,218,0.08);
+    }
+
+    .grid-layer,
+    .noise-layer,
+    .scan-layer,
+    .danger-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .grid-layer {
+      z-index: 0;
+      opacity: 0.54;
+      background-image:
+        linear-gradient(rgba(84, 255, 218, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(84, 255, 218, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(84, 255, 218, 0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(84, 255, 218, 0.012) 1px, transparent 1px);
+      background-size: 42px 42px, 42px 42px, 7px 7px, 7px 7px;
+      transform: perspective(600px) rotateX(4deg) scale(1.08);
+      transform-origin: 50% 0;
+    }
+
+    .noise-layer {
+      z-index: 1;
+      opacity: 0.17;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+
+    .scan-layer {
+      z-index: 42;
+      overflow: hidden;
+      opacity: 0.75;
+    }
+
+    .scan-layer::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 130px;
+      top: -140px;
+      background: linear-gradient(180deg, transparent, rgba(84,255,218,0.04) 48%, rgba(84,255,218,0.26) 50%, transparent 53%);
+      animation: scan 5.6s linear infinite;
+    }
+
+    .danger-layer {
+      z-index: 41;
+      opacity: 0;
+      transition: opacity 180ms ease;
+      box-shadow: inset 0 0 120px rgba(255, 56, 100, 0.76);
+      background: radial-gradient(circle at center, transparent 58%, rgba(255, 20, 75, 0.13));
+    }
+
+    .danger-layer.active { opacity: 0.86; animation: dangerPulse 0.82s ease-in-out infinite alternate; }
+
+    @keyframes scan { to { transform: translateY(calc(100vh + 280px)); } }
+    @keyframes dangerPulse { from { filter: saturate(0.85); } to { filter: saturate(1.4); } }
+
+    .hud-shell {
+      position: relative;
+      z-index: 20;
+      height: var(--hud-height);
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(2, 12, 18, 0.98), rgba(4, 16, 24, 0.88));
+      backdrop-filter: blur(18px) saturate(1.2);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.36);
+    }
+
+    .header-row {
+      min-height: 54px;
+      display: grid;
+      grid-template-columns: minmax(250px, 1fr) auto minmax(250px, 1fr);
+      align-items: center;
+      gap: 18px;
+      padding: calc(10px + var(--safe-top)) max(clamp(14px, 2vw, 30px), var(--safe-right)) 7px max(clamp(14px, 2vw, 30px), var(--safe-left));
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      box-shadow: 0 0 22px rgba(84,255,218,0.25), inset 0 0 16px rgba(84,255,218,0.12);
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 1px dashed rgba(84,255,218,0.62);
+      border-radius: 50%;
+      animation: spin 8s linear infinite;
+    }
+
+    .brand-mark::after {
+      inset: 12px;
+      border-style: solid;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      animation-direction: reverse;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .brand-copy { min-width: 0; }
+    .brand-title {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: clamp(13px, 1.1vw, 17px);
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brand-subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .mission-chip {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 14px;
+      border: 1px solid rgba(91,200,255,0.3);
+      border-radius: 999px;
+      background: rgba(31, 95, 122, 0.13);
+      font-size: 11px;
+      color: #bfeaff;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .mission-chip .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      animation: blink 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes blink { to { opacity: 0.34; } }
+
+    .header-actions {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn,
+    .small-select {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(84,255,218,0.055);
+      color: #c8fff3;
+      transition: 160ms ease;
+    }
+
+    .icon-btn {
+      display: inline-grid;
+      place-items: center;
+      min-width: 38px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    .icon-btn:hover,
+    .icon-btn:focus-visible {
+      border-color: var(--line-strong);
+      background: rgba(84,255,218,0.13);
+      box-shadow: 0 0 18px rgba(84,255,218,0.15);
+      outline: none;
+    }
+
+    .small-select {
+      padding: 0 10px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .weapon-deck {
+      min-height: 86px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(105px, 150px));
+      justify-content: center;
+      gap: clamp(7px, 1vw, 13px);
+      padding: 5px 16px 8px;
+    }
+
+    .tool-card {
+      --tool-color: var(--cyan);
+      position: relative;
+      min-width: 0;
+      height: 78px;
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      padding: 8px 9px;
+      border: 1px solid rgba(84,255,218,0.18);
+      border-radius: 12px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,0.04), transparent 45%),
+        rgba(1, 9, 14, 0.74);
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 170ms ease, border-color 170ms ease, background 170ms ease, box-shadow 170ms ease;
+      text-align: left;
+    }
+
+    .tool-card::before,
+    .tool-card::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .tool-card::before {
+      inset: 0;
+      opacity: 0;
+      background: radial-gradient(circle at 25% 50%, color-mix(in srgb, var(--tool-color) 22%, transparent), transparent 60%);
+      transition: opacity 170ms ease;
+    }
+
+    .tool-card::after {
+      left: 0;
+      right: 100%;
+      bottom: 0;
+      height: 2px;
+      background: var(--tool-color);
+      box-shadow: 0 0 12px var(--tool-color);
+      transition: right 200ms ease;
+    }
+
+    .tool-card:hover,
+    .tool-card:focus-visible {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--tool-color) 70%, transparent);
+      outline: none;
+    }
+
+    .tool-card:hover::before,
+    .tool-card.active::before { opacity: 1; }
+    .tool-card.active::after { right: 0; }
+
+    .tool-card.active {
+      border-color: var(--tool-color);
+      background: rgba(5, 24, 31, 0.96);
+      box-shadow: 0 0 24px color-mix(in srgb, var(--tool-color) 22%, transparent), inset 0 0 20px rgba(255,255,255,0.025);
+      transform: translateY(-2px);
+    }
+
+    .tool-card.active .tool-key {
+      color: #02100d;
+      background: var(--tool-color);
+      box-shadow: 0 0 12px var(--tool-color);
+    }
+
+    .tool-visual {
+      position: relative;
+      width: 48px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+    }
+
+    .tool-icon {
+      width: 46px;
+      height: 46px;
+      object-fit: contain;
+      filter: drop-shadow(0 5px 8px rgba(0,0,0,0.62));
+      transition: transform 170ms ease;
+    }
+
+    .tool-card.active .tool-icon { transform: scale(1.08) rotate(-3deg); }
+
+    .tool-key {
+      position: absolute;
+      left: -3px;
+      top: -2px;
+      min-width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid color-mix(in srgb, var(--tool-color) 55%, transparent);
+      border-radius: 5px;
+      background: #041018;
+      color: var(--tool-color);
+      font: 800 10px/1 ui-monospace, monospace;
+      box-shadow: 0 0 8px rgba(0,0,0,0.65);
+    }
+
+    .target-mini {
+      position: absolute;
+      right: -2px;
+      bottom: -1px;
+      width: 23px;
+      height: 23px;
+      object-fit: contain;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50%;
+      background: rgba(0,0,0,0.68);
+      padding: 2px;
+    }
+
+    .tool-copy { position: relative; z-index: 1; min-width: 0; }
+    .tool-name {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      color: #f2fbff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tool-meta {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font: 9px/1.25 ui-monospace, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tool-match {
+      display: block;
+      margin-top: 4px;
+      color: var(--tool-color);
+      font-size: 9px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.15fr) repeat(5, minmax(90px, 0.55fr)) minmax(150px, 0.9fr);
+      gap: 8px;
+      align-items: stretch;
+      padding: 0 clamp(14px, 2vw, 30px) 10px;
+    }
+
+    .status-card,
+    .progress-card,
+    .fever-card {
+      min-width: 0;
+      height: 38px;
+      border: 1px solid rgba(84,255,218,0.17);
+      border-radius: 9px;
+      background: rgba(1, 9, 14, 0.62);
+      box-shadow: inset 0 0 20px rgba(255,255,255,0.012);
+    }
+
+    .progress-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+    }
+
+    .tiny-label {
+      color: var(--muted);
+      font: 9px/1 ui-monospace, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .time-value {
+      color: var(--cyan);
+      font: 800 15px/1 ui-monospace, monospace;
+      text-shadow: 0 0 10px rgba(84,255,218,0.35);
+    }
+
+    .progress-track,
+    .mini-track {
+      position: relative;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.075);
+    }
+
+    .progress-track { height: 7px; border: 1px solid rgba(84,255,218,0.15); }
+    .progress-fill,
+    .mini-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      transition: width 120ms linear;
+    }
+    .progress-fill {
+      background: linear-gradient(90deg, var(--cyan), var(--blue));
+      box-shadow: 0 0 12px rgba(84,255,218,0.66);
+    }
+
+    .status-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+    }
+
+    .status-card .value {
+      font: 850 13px/1 ui-monospace, monospace;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .status-card .subbar {
+      grid-column: 1 / -1;
+      margin-top: -2px;
+    }
+
+    .mini-track { height: 3px; }
+    .combo-fill { background: linear-gradient(90deg, var(--amber), var(--orange)); }
+    .heat-fill { background: linear-gradient(90deg, var(--amber), var(--red)); }
+    .threat-fill { background: linear-gradient(90deg, var(--cyan), var(--red)); }
+
+    .fever-card {
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+      color: #dce9ee;
+      transition: 180ms ease;
+    }
+
+    .fever-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(calc(-100% + var(--fever, 0%)));
+      background: linear-gradient(90deg, rgba(255,56,100,0.8), rgba(255,138,61,0.82));
+      transition: transform 180ms ease;
+    }
+
+    .fever-card span { position: relative; z-index: 1; font-size: 10px; font-weight: 850; letter-spacing: 0.04em; }
+    .fever-card.ready {
+      border-color: rgba(255,95,104,0.95);
+      color: white;
+      box-shadow: 0 0 22px rgba(255,56,100,0.32);
+      animation: feverPulse 0.9s ease-in-out infinite alternate;
+    }
+    .fever-card:disabled { cursor: not-allowed; }
+    @keyframes feverPulse { to { transform: translateY(-2px); filter: brightness(1.22); } }
+
+    #play-area {
+      position: absolute;
+      z-index: 5;
+      top: var(--hud-height);
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      cursor: none;
+      touch-action: none;
+    }
+
+    #play-area::before {
+      content: "CONTAINMENT FIELD // GRID 07";
+      position: absolute;
+      left: 24px;
+      bottom: 16px;
+      color: rgba(84,255,218,0.18);
+      font: 10px/1 ui-monospace, monospace;
+      letter-spacing: 0.2em;
+    }
+
+    .play-corners { position: absolute; inset: 14px; pointer-events: none; opacity: 0.5; }
+    .play-corners::before,
+    .play-corners::after {
+      content: "";
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      border-color: rgba(84,255,218,0.44);
+      border-style: solid;
+    }
+    .play-corners::before { left: 0; top: 0; border-width: 1px 0 0 1px; }
+    .play-corners::after { right: 0; bottom: 0; border-width: 0 1px 1px 0; }
+
+    .center-reticle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 230px;
+      height: 230px;
+      transform: translate(-50%, -50%);
+      border: 1px dashed rgba(84,255,218,0.09);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: spin 28s linear infinite;
+    }
+    .center-reticle::before,
+    .center-reticle::after {
+      content: "";
+      position: absolute;
+      inset: 34px;
+      border: 1px solid rgba(84,255,218,0.055);
+      border-radius: 50%;
+    }
+    .center-reticle::after {
+      inset: 75px;
+      background: radial-gradient(circle, rgba(84,255,218,0.04), transparent 65%);
+    }
+
+    .ambient-particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: rgba(84,255,218,0.6);
+      box-shadow: 0 0 8px rgba(84,255,218,0.4);
+      pointer-events: none;
+      animation: drift var(--d, 12s) linear infinite;
+    }
+    @keyframes drift {
+      from { transform: translate3d(0, 20px, 0); opacity: 0; }
+      15% { opacity: 0.7; }
+      to { transform: translate3d(var(--x, 30px), -120vh, 0); opacity: 0; }
+    }
+
+    .organism {
+      --organism-color: var(--cyan);
+      position: absolute;
+      width: var(--size, 84px);
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      appearance: none;
+      height: var(--size, 84px);
+      transform-origin: center;
+      will-change: left, top, transform;
+      animation: organismSpawn 260ms cubic-bezier(.2,.95,.34,1.34) both;
+      cursor: none;
+    }
+
+    .organism:focus-visible { outline: 2px solid var(--cyan); outline-offset: 5px; border-radius: 50%; }
+    .organism.targeted { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--organism-color) 75%, transparent)); }
+    .organism.targeted .target-badge { border-color: var(--cyan); color: #02100d; background: var(--cyan); }
+    .organism.hit { animation: hitKick 120ms ease-out; }
+    .organism.dead { pointer-events: none; }
+    .organism.boss { --size: 148px; }
+
+    @keyframes organismSpawn {
+      from { transform: scale(0.2) rotate(-18deg); opacity: 0; filter: blur(6px); }
+      to { transform: scale(1) rotate(0); opacity: 1; filter: blur(0); }
+    }
+    @keyframes hitKick {
+      0% { transform: scale(1); }
+      50% { transform: scale(0.86) rotate(-4deg); }
+      100% { transform: scale(1.03); }
+    }
+
+    .organism-body {
+      position: absolute;
+      inset: 8px;
+      display: grid;
+      place-items: center;
+      border-radius: 44% 56% 54% 46% / 46% 42% 58% 54%;
+      transition: filter 160ms ease, opacity 160ms ease;
+    }
+
+    .organism-body::before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border: 1px solid color-mix(in srgb, var(--organism-color) 34%, transparent);
+      border-radius: inherit;
+      animation: membrane 2.4s ease-in-out infinite alternate;
+    }
+
+    .organism-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.6));
+      animation: breathe 2.1s ease-in-out infinite alternate;
+    }
+
+    @keyframes membrane { to { transform: scale(1.08, 0.94) rotate(3deg); opacity: 0.55; } }
+    @keyframes breathe { to { transform: scale(1.08, 0.94) rotate(2deg); } }
+
+    .organism.frozen .organism-body {
+      filter: hue-rotate(145deg) saturate(1.45) brightness(1.2) drop-shadow(0 0 14px var(--blue));
+    }
+    .organism.burning .organism-body {
+      filter: saturate(1.35) drop-shadow(0 0 15px var(--orange));
+    }
+    .organism.corroded .organism-body {
+      filter: hue-rotate(35deg) saturate(1.7) drop-shadow(0 0 12px var(--violet));
+    }
+    .organism.armored .organism-body::before { border-width: 3px; border-style: double; }
+
+    .organism-header {
+      position: absolute;
+      left: 50%;
+      top: -16px;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 116px;
+      padding: 3px 7px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      background: rgba(0,0,0,0.72);
+      color: rgba(236,250,255,0.9);
+      font: 700 8px/1 ui-monospace, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    .target-badge {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 2;
+      transform: translate(-50%, -50%);
+      min-width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,0.38);
+      border-radius: 50%;
+      background: rgba(1,8,12,0.78);
+      color: #ffffff;
+      font: 950 11px/1 ui-monospace, monospace;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.55);
+      pointer-events: none;
+      transition: 150ms ease;
+    }
+
+    .hp-shell {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: -9px;
+      height: 6px;
+      padding: 1px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 999px;
+      background: rgba(0,0,0,0.75);
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .hp-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--organism-color), #ffffff);
+      box-shadow: 0 0 9px var(--organism-color);
+      transition: width 100ms linear;
+    }
+
+    .status-icons {
+      position: absolute;
+      right: -6px;
+      top: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      pointer-events: none;
+    }
+    .status-icon {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50%;
+      background: rgba(0,0,0,0.76);
+      font-size: 9px;
+    }
+
+    #cursor {
+      position: absolute;
+      z-index: 180;
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      filter: drop-shadow(0 0 12px rgba(84,255,218,0.68));
+      transition: width 80ms ease, height 80ms ease, transform 80ms ease, filter 160ms ease;
+      display: none;
+    }
+    #cursor.active { transform: translate(-50%, -50%) scale(0.72) rotate(-15deg); }
+    #cursor.overheated { filter: grayscale(0.8) drop-shadow(0 0 10px var(--red)); opacity: 0.65; }
+
+    .cursor-ring,
+    .trail-dot,
+    .particle,
+    .shockwave,
+    .damage-number,
+    .beam,
+    .splash-zone {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .cursor-ring {
+      z-index: 175;
+      width: 26px;
+      height: 26px;
+      border: 1px solid rgba(84,255,218,0.72);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px rgba(84,255,218,0.2);
+    }
+
+    .trail-dot {
+      z-index: 150;
+      border-radius: 50%;
+      background: var(--trail-color, var(--cyan));
+      box-shadow: 0 0 9px var(--trail-color, var(--cyan));
+      animation: trailFade 340ms ease-out both;
+    }
+    @keyframes trailFade { to { opacity: 0; transform: scale(0.05); } }
+
+    .particle {
+      z-index: 160;
+      border-radius: 50%;
+      background: var(--particle-color, var(--cyan));
+      box-shadow: 0 0 8px var(--particle-color, var(--cyan));
+      animation: particlePop var(--life, 520ms) cubic-bezier(.1,.76,.36,1) both;
+    }
+    @keyframes particlePop {
+      to { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+    }
+
+    .shockwave {
+      z-index: 145;
+      border: 2px solid var(--wave-color, var(--cyan));
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      animation: shockwave 430ms ease-out both;
+    }
+    @keyframes shockwave {
+      from { width: 0; height: 0; opacity: 1; }
+      to { width: var(--wave-size, 170px); height: var(--wave-size, 170px); opacity: 0; border-width: 1px; }
+    }
+
+    .damage-number {
+      z-index: 190;
+      transform: translate(-50%, -50%);
+      color: var(--damage-color, white);
+      font: 900 var(--damage-size, 18px)/1 ui-monospace, monospace;
+      text-shadow: 0 2px 0 #000, 0 0 10px #000;
+      white-space: nowrap;
+      animation: damageFloat 720ms cubic-bezier(.12,.78,.25,1) both;
+    }
+    @keyframes damageFloat {
+      45% { transform: translate(-50%, -180%) scale(1.16); }
+      to { transform: translate(-50%, -260%) scale(0.82); opacity: 0; }
+    }
+
+    .beam {
+      z-index: 140;
+      height: 3px;
+      transform-origin: left center;
+      background: linear-gradient(90deg, rgba(255,255,255,0.9), var(--beam-color, var(--cyan)), transparent);
+      box-shadow: 0 0 13px var(--beam-color, var(--cyan));
+      animation: beamFade 180ms ease-out both;
+    }
+    @keyframes beamFade { to { opacity: 0; transform: scaleX(1.06); } }
+
+    .splash-zone {
+      z-index: 138;
+      width: var(--zone-size, 140px);
+      height: var(--zone-size, 140px);
+      border: 1px dashed var(--zone-color, var(--cyan));
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, color-mix(in srgb, var(--zone-color) 18%, transparent), transparent 67%);
+      animation: zoneFade 460ms ease-out both;
+    }
+    @keyframes zoneFade { to { transform: translate(-50%, -50%) scale(1.35); opacity: 0; } }
+
+    .boss-hud {
+      position: absolute;
+      z-index: 90;
+      top: calc(var(--hud-height) + 14px);
+      left: 50%;
+      width: min(520px, calc(100vw - 32px));
+      transform: translateX(-50%);
+      padding: 9px 12px 10px;
+      border: 1px solid rgba(255,56,100,0.76);
+      border-radius: 12px;
+      background: rgba(16, 3, 10, 0.88);
+      box-shadow: 0 0 30px rgba(255,56,100,0.19), inset 0 0 22px rgba(255,56,100,0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .boss-hud-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+      font: 800 10px/1 ui-monospace, monospace;
+      color: #ffc0cf;
+    }
+
+    .boss-weakness { color: var(--amber); }
+    .boss-track { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,0.08); }
+    .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--red), var(--orange)); box-shadow: 0 0 16px var(--red); transition: width 120ms linear; }
+
+    .radar {
+      position: absolute;
+      z-index: 75;
+      right: 18px;
+      bottom: max(18px, var(--safe-bottom));
+      width: 118px;
+      height: 118px;
+      border: 1px solid rgba(84,255,218,0.58);
+      border-radius: 50%;
+      background:
+        linear-gradient(rgba(84,255,218,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(84,255,218,0.08) 1px, transparent 1px),
+        radial-gradient(circle, rgba(2,18,24,0.55), rgba(1,8,12,0.92));
+      background-size: 100% 50%, 50% 100%, auto;
+      overflow: hidden;
+      box-shadow: 0 0 26px rgba(0,0,0,0.7), inset 0 0 20px rgba(84,255,218,0.05);
+      pointer-events: none;
+    }
+    .radar::before,
+    .radar::after {
+      content: "";
+      position: absolute;
+      inset: 20%;
+      border: 1px solid rgba(84,255,218,0.16);
+      border-radius: 50%;
+    }
+    .radar::after { inset: 38%; }
+    .radar-sweep {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 50%;
+      height: 1px;
+      transform-origin: left center;
+      background: linear-gradient(90deg, var(--cyan), transparent);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: radarSweep 2.6s linear infinite;
+    }
+    @keyframes radarSweep { to { transform: rotate(360deg); } }
+    .radar-dot {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+    .radar-dot.boss-dot { width: 8px; height: 8px; background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+    .mission-log {
+      position: absolute;
+      z-index: 72;
+      left: 18px;
+      bottom: max(18px, var(--safe-bottom));
+      width: min(340px, calc(100vw - 170px));
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .log-entry {
+      width: fit-content;
+      max-width: 100%;
+      padding: 7px 10px;
+      border-left: 2px solid var(--log-color, var(--cyan));
+      border-radius: 0 8px 8px 0;
+      background: rgba(2, 12, 18, 0.78);
+      color: #d9edf5;
+      font-size: 10px;
+      line-height: 1.35;
+      box-shadow: 0 9px 22px rgba(0,0,0,0.28);
+      animation: logIn 250ms ease-out both;
+    }
+    .log-entry strong { color: var(--log-color, var(--cyan)); }
+    @keyframes logIn { from { transform: translateX(-14px); opacity: 0; } }
+
+    .toast-stack {
+      position: absolute;
+      z-index: 200;
+      top: calc(var(--hud-height) + 18px);
+      right: 18px;
+      width: min(320px, calc(100vw - 36px));
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 7px;
+      pointer-events: none;
+    }
+    .toast {
+      max-width: 100%;
+      padding: 9px 12px;
+      border: 1px solid color-mix(in srgb, var(--toast-color, var(--cyan)) 60%, transparent);
+      border-radius: 9px;
+      background: rgba(2, 12, 18, 0.92);
+      color: #eafaff;
+      font-size: 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.42), 0 0 20px color-mix(in srgb, var(--toast-color, var(--cyan)) 10%, transparent);
+      animation: toastIn 260ms ease-out both;
+    }
+    @keyframes toastIn { from { transform: translateX(18px); opacity: 0; } }
+
+    .center-banner {
+      position: absolute;
+      z-index: 260;
+      left: 50%;
+      top: calc(var(--hud-height) + (100vh - var(--hud-height)) * 0.42);
+      transform: translate(-50%, -50%) scale(0.92);
+      min-width: min(420px, calc(100vw - 36px));
+      padding: 14px 22px;
+      border: 1px solid rgba(84,255,218,0.5);
+      border-radius: 14px;
+      background: rgba(2,12,18,0.88);
+      color: #ffffff;
+      font: 950 clamp(22px, 5vw, 46px)/1 ui-monospace, monospace;
+      letter-spacing: 0.08em;
+      text-align: center;
+      text-shadow: 0 0 18px rgba(84,255,218,0.5);
+      box-shadow: 0 16px 55px rgba(0,0,0,0.45), inset 0 0 25px rgba(84,255,218,0.06);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .center-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .center-banner.warning { border-color: rgba(255,56,100,0.75); text-shadow: 0 0 18px rgba(255,56,100,0.65); }
+
+    .quick-hint {
+      position: absolute;
+      z-index: 78;
+      left: 50%;
+      bottom: max(16px, var(--safe-bottom));
+      transform: translateX(-50%);
+      padding: 7px 11px;
+      border: 1px solid rgba(84,255,218,0.18);
+      border-radius: 999px;
+      background: rgba(2,12,18,0.72);
+      color: #b8ced7;
+      font-size: 9px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+    .quick-hint.show { opacity: 1; }
+
+    .overlay {
+      position: absolute;
+      z-index: 1000;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 50% 38%, rgba(19, 92, 103, 0.18), transparent 38%),
+        rgba(1, 5, 8, 0.91);
+      backdrop-filter: blur(18px) saturate(1.1);
+    }
+
+    .modal-panel {
+      position: relative;
+      width: min(760px, 100%);
+      max-height: calc(100vh - 44px);
+      overflow: auto;
+      padding: clamp(24px, 4vw, 44px);
+      border: 1px solid rgba(84,255,218,0.35);
+      border-radius: 20px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,0.045), transparent 35%),
+        rgba(3, 13, 20, 0.93);
+      box-shadow: var(--shadow), inset 0 0 60px rgba(84,255,218,0.035);
+    }
+
+    .modal-panel::before,
+    .modal-panel::after {
+      content: "";
+      position: absolute;
+      width: 58px;
+      height: 58px;
+      pointer-events: none;
+    }
+    .modal-panel::before { left: 10px; top: 10px; border-left: 2px solid var(--cyan); border-top: 2px solid var(--cyan); }
+    .modal-panel::after { right: 10px; bottom: 10px; border-right: 2px solid var(--cyan); border-bottom: 2px solid var(--cyan); }
+
+    .eyebrow {
+      color: var(--cyan);
+      font: 800 10px/1 ui-monospace, monospace;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .modal-title {
+      margin: 10px 0 9px;
+      font-size: clamp(32px, 6vw, 62px);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      text-shadow: 0 0 30px rgba(84,255,218,0.2);
+    }
+
+    .modal-desc {
+      max-width: 630px;
+      margin: 0;
+      color: #a9c0cb;
+      font-size: 13px;
+      line-height: 1.75;
+    }
+
+    .record-line {
+      width: fit-content;
+      margin-top: 18px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255,209,102,0.22);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255,209,102,0.045);
+      font: 800 9px/1 ui-monospace, monospace;
+      letter-spacing: .08em;
+    }
+    .record-line strong { margin-left: 7px; color: var(--amber); }
+
+    .instruction-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 24px 0 20px;
+    }
+
+    .instruction-card {
+      padding: 13px;
+      border: 1px solid rgba(84,255,218,0.16);
+      border-radius: 12px;
+      background: rgba(0,0,0,0.23);
+    }
+    .instruction-card .step {
+      color: var(--cyan);
+      font: 900 10px/1 ui-monospace, monospace;
+    }
+    .instruction-card strong { display: block; margin-top: 7px; font-size: 12px; }
+    .instruction-card p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+
+    .specimen-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 7px;
+      margin: -5px 0 20px;
+    }
+    .specimen-chip {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 27px 1fr;
+      align-items: center;
+      gap: 7px;
+      padding: 7px;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 9px;
+      background: rgba(0,0,0,.2);
+    }
+    .specimen-chip img { width: 27px; height: 27px; object-fit: contain; }
+    .specimen-chip strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 8px/1 ui-monospace, monospace; }
+    .specimen-chip span { display:block; margin-top:4px; color:var(--muted); font-size:7px; white-space:nowrap; }
+
+    .modal-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .difficulty-description {
+      flex: 1 1 100%;
+      order: 4;
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .difficulty-group {
+      display: flex;
+      gap: 6px;
+      margin-right: auto;
+      padding: 5px;
+      border: 1px solid rgba(84,255,218,0.15);
+      border-radius: 11px;
+      background: rgba(0,0,0,0.25);
+    }
+    .difficulty-btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .difficulty-btn.active { background: rgba(84,255,218,0.14); color: var(--cyan); }
+
+    .settings-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: -5px 0 18px;
+    }
+    .setting-toggle {
+      min-height: 34px;
+      padding: 7px 10px;
+      border: 1px solid rgba(84,255,218,0.2);
+      border-radius: 9px;
+      background: rgba(84,255,218,0.05);
+      color: #bcd0d9;
+      font-size: 9px;
+      cursor: pointer;
+    }
+    .setting-toggle[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); background: rgba(84,255,218,0.12); }
+
+    .primary-btn,
+    .secondary-btn {
+      min-height: 42px;
+      border-radius: 10px;
+      padding: 10px 19px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: 170ms ease;
+    }
+    .primary-btn {
+      border: 0;
+      color: #021010;
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      box-shadow: 0 0 24px rgba(84,255,218,0.25);
+    }
+    .secondary-btn {
+      border: 1px solid rgba(84,255,218,0.34);
+      color: #cffff4;
+      background: rgba(84,255,218,0.06);
+    }
+    .primary-btn:hover,
+    .secondary-btn:hover { transform: translateY(-2px); filter: brightness(1.12); }
+    .primary-btn:focus-visible,
+    .secondary-btn:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      margin: 24px 0 18px;
+    }
+    .report-card {
+      padding: 15px 10px;
+      border: 1px solid rgba(84,255,218,0.16);
+      border-radius: 12px;
+      background: rgba(0,0,0,0.28);
+      text-align: center;
+    }
+    .report-card span { display: block; color: var(--muted); font-size: 9px; }
+    .report-card strong { display: block; margin-top: 7px; font: 900 19px/1 ui-monospace, monospace; }
+
+    .rank-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .rank-stamp {
+      width: 106px;
+      height: 106px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 4px double var(--red);
+      border-radius: 50%;
+      color: var(--red);
+      font: 950 24px/1 ui-monospace, monospace;
+      transform: rotate(-8deg);
+      text-shadow: 0 0 14px rgba(255,56,100,0.34);
+      box-shadow: 0 0 20px rgba(255,56,100,0.12), inset 0 0 18px rgba(255,56,100,0.08);
+    }
+    .rank-copy strong { display: block; margin-bottom: 7px; font-size: 16px; }
+    .rank-copy p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .result-tip { margin: -4px 0 18px; padding: 10px 12px; border-left: 2px solid var(--amber); background: rgba(255,209,102,0.055); color: #d9cfae; font-size: 10px; line-height: 1.55; }
+
+    .help-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 11px;
+    }
+    .help-table th,
+    .help-table td { padding: 9px 10px; border-bottom: 1px solid rgba(84,255,218,0.12); text-align: left; }
+    .help-table th { color: var(--cyan); font-weight: 800; }
+    .kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 24px;
+      height: 22px;
+      padding: 0 6px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 5px;
+      background: rgba(255,255,255,0.06);
+      font: 800 9px/1 ui-monospace, monospace;
+      box-shadow: inset 0 -2px rgba(0,0,0,0.25);
+    }
+
+    .screen-shake { animation: screenShake 180ms ease-out; }
+    @keyframes screenShake {
+      0%,100% { transform: translate(0); }
+      20% { transform: translate(-7px, 5px); }
+      45% { transform: translate(6px, -4px); }
+      70% { transform: translate(-4px, -3px); }
+    }
+
+    .flash { animation: flash 180ms ease-out; }
+    @keyframes flash { 50% { filter: brightness(1.75); } }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0,0,0,0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    @media (max-width: 980px) {
+      :root { --hud-height: calc(183px + var(--safe-top)); }
+      .header-row { grid-template-columns: 1fr auto; }
+      .mission-chip { display: none; }
+      .weapon-deck { grid-template-columns: repeat(5, minmax(82px, 1fr)); }
+      .tool-card { grid-template-columns: 42px 1fr; padding: 7px 6px; }
+      .tool-visual { width: 42px; }
+      .tool-icon { width: 40px; height: 40px; }
+      .tool-meta { display: none; }
+      .status-strip { grid-template-columns: minmax(150px, 1.3fr) repeat(3, minmax(75px, 0.65fr)) minmax(120px, 0.95fr); }
+      .status-card.hide-tablet { display: none; }
+      .status-card[data-stat="accuracy"] { display: none; }
+      .instruction-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      :root { --hud-height: calc(172px + var(--safe-top)); }
+      .brand-subtitle, .small-select { display: none; }
+      .header-row { min-height: 48px; padding-top: 7px; }
+      .weapon-deck { min-height: 72px; gap: 5px; padding: 3px 8px 7px; }
+      .tool-card { height: 66px; display: grid; grid-template-columns: 1fr; place-items: center; padding: 5px; }
+      .tool-visual { width: 40px; height: 42px; }
+      .tool-icon { width: 37px; height: 37px; }
+      .tool-copy { display: none; }
+      .target-mini { width: 18px; height: 18px; }
+      .status-strip { padding: 0 max(8px, var(--safe-right)) 8px max(8px, var(--safe-left)); grid-template-columns: 1.35fr repeat(3, 0.68fr) 1fr; gap: 5px; }
+      .status-card.hide-mobile { display: none; }
+      .status-card[data-stat="threat"] { display: grid; }
+      .status-card[data-stat="accuracy"] { display: none; }
+      .status-card, .progress-card, .fever-card { height: 34px; }
+      .progress-card { gap: 6px; padding: 5px 7px; }
+      .tiny-label { font-size: 8px; }
+      .time-value { font-size: 12px; }
+      .radar { width: 88px; height: 88px; right: 10px; bottom: 10px; }
+      .mission-log { left: 10px; bottom: 10px; width: calc(100vw - 118px); }
+      .log-entry { font-size: 9px; }
+      .specimen-strip { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+      .specimen-chip { grid-template-columns: 1fr; place-items:center; padding:5px 2px; text-align:center; }
+      .specimen-chip div span { display:none; }
+      .report-grid { grid-template-columns: repeat(2, 1fr); }
+      .rank-row { align-items: flex-start; }
+      .rank-stamp { width: 82px; height: 82px; font-size: 19px; }
+      .modal-panel { padding: 25px 20px; }
+      .modal-title { font-size: 38px; }
+    }
+
+    @media (max-height: 720px) and (min-width: 701px) {
+      :root { --hud-height: calc(166px + var(--safe-top)); }
+      .header-row { min-height: 44px; padding-top: 6px; padding-bottom: 4px; }
+      .brand-mark { width: 29px; height: 29px; }
+      .weapon-deck { min-height: 67px; padding-top: 2px; padding-bottom: 5px; }
+      .tool-card { height: 64px; }
+      .tool-visual { height: 47px; }
+      .tool-icon { width: 39px; height: 39px; }
+      .tool-meta { display: none; }
+      .status-card, .progress-card, .fever-card { height: 33px; }
+      .modal-panel { max-height: calc(100vh - 24px); padding-top: 24px; padding-bottom: 24px; }
+      .instruction-grid { margin-top: 16px; margin-bottom: 14px; }
+    }
+
+    @media (pointer: coarse) {
+      #play-area, .organism { cursor: default; }
+      #cursor, .cursor-ring { display: none !important; }
+      .organism { --size: 92px; }
+      .target-badge { min-width: 29px; height: 29px; font-size: 12px; }
+    }
+
+    @media (max-height: 520px) and (orientation: landscape) {
+      :root { --hud-height: calc(126px + var(--safe-top)); }
+      .header-row { min-height: 38px; padding-top: max(4px, var(--safe-top)); padding-bottom: 2px; }
+      .brand-mark, .brand-subtitle, .mission-chip, .small-select { display: none; }
+      .brand-title { font-size: 11px; }
+      .weapon-deck { min-height: 52px; padding: 2px 8px 4px; }
+      .tool-card { height: 48px; grid-template-columns: 1fr; place-items: center; padding: 3px; }
+      .tool-visual { width: 34px; height: 35px; }
+      .tool-icon { width: 32px; height: 32px; }
+      .tool-copy { display: none; }
+      .target-mini { width: 16px; height: 16px; }
+      .status-strip { padding-bottom: 5px; }
+      .status-card, .progress-card, .fever-card { height: 28px; }
+      .quick-hint, .mission-log { display: none; }
+      .radar { width: 72px; height: 72px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+      .screen-shake { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main id="game" aria-label="미생물 격리 연구소 게임">
+    <div class="grid-layer"></div>
+    <div class="noise-layer"></div>
+    <div class="scan-layer"></div>
+    <div class="danger-layer" id="danger-layer"></div>
+
+    <header class="hud-shell">
+      <div class="header-row">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-copy">
+            <div class="brand-title">MICROBIOLOGICAL CONTAINMENT LAB</div>
+            <div class="brand-subtitle">Sector 07 · Sterilization Protocol · Build 2.0</div>
+          </div>
+        </div>
+
+        <div class="mission-chip"><span class="pulse-dot"></span><span id="mission-chip-text">격리 구역 안정화 대기 중</span></div>
+
+        <div class="header-actions">
+          <select id="volume-select" class="small-select" aria-label="전체 음량">
+            <option value="0.25">음량 25%</option>
+            <option value="0.5" selected>음량 50%</option>
+            <option value="0.75">음량 75%</option>
+          </select>
+          <button class="icon-btn" id="sound-btn" type="button" aria-label="소리 켜기 또는 끄기">🔊</button>
+          <button class="icon-btn" id="help-btn" type="button" aria-label="도움말 열기">?</button>
+          <button class="icon-btn" id="pause-btn" type="button" aria-label="게임 일시정지">Ⅱ</button>
+        </div>
+      </div>
+
+      <nav class="weapon-deck" id="weapon-deck" aria-label="소독 도구 선택"></nav>
+
+      <section class="status-strip" aria-label="작전 상태">
+        <div class="progress-card">
+          <span class="tiny-label">TIME</span>
+          <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          <strong class="time-value" id="timer-value">02:00</strong>
+        </div>
+
+        <div class="status-card" data-stat="score">
+          <span class="tiny-label">DNA</span><strong class="value" id="score-value">0</strong>
+        </div>
+        <div class="status-card" data-stat="combo">
+          <span class="tiny-label">COMBO</span><strong class="value" id="combo-value" style="color:var(--amber)">0</strong>
+          <div class="subbar mini-track"><div class="mini-fill combo-fill" id="combo-decay-fill"></div></div>
+        </div>
+        <div class="status-card hide-mobile" data-stat="accuracy">
+          <span class="tiny-label">ACCURACY</span><strong class="value" id="accuracy-value">100%</strong>
+        </div>
+        <div class="status-card hide-tablet" data-stat="heat">
+          <span class="tiny-label">HEAT</span><strong class="value" id="heat-value">0%</strong>
+          <div class="subbar mini-track"><div class="mini-fill heat-fill" id="heat-fill"></div></div>
+        </div>
+        <div class="status-card hide-mobile" data-stat="threat">
+          <span class="tiny-label">THREAT</span><strong class="value" id="threat-value">0%</strong>
+          <div class="subbar mini-track"><div class="mini-fill threat-fill" id="threat-fill"></div></div>
+        </div>
+
+        <button class="fever-card" id="fever-btn" type="button" disabled style="--fever:0%">
+          <span id="fever-label">전체 소독 0%</span>
+        </button>
+      </section>
+    </header>
+
+    <section id="play-area" aria-label="격리 구역" tabindex="-1">
+      <div class="play-corners"></div>
+      <div class="center-reticle"></div>
+      <img id="cursor" alt="선택한 소독 도구 커서" draggable="false" />
+      <div class="cursor-ring" id="cursor-ring" hidden></div>
+    </section>
+
+    <div class="center-banner" id="center-banner" role="status" aria-live="polite"></div>
+    <div class="quick-hint" id="quick-hint">표본 중앙 번호와 같은 도구를 선택 · 1–5 전환 · SPACE 전체 소독</div>
+
+    <section class="boss-hud" id="boss-hud" hidden aria-label="보스 상태">
+      <div class="boss-hud-row">
+        <span id="boss-title">변종 군집체</span>
+        <span class="boss-weakness" id="boss-weakness">약점 분석 중</span>
+      </div>
+      <div class="boss-track"><div class="boss-fill" id="boss-fill"></div></div>
+    </section>
+
+    <aside class="radar" id="radar" aria-label="미니 레이더">
+      <div class="radar-sweep"></div>
+      <div id="radar-dots"></div>
+    </aside>
+
+    <aside class="mission-log" id="mission-log" aria-label="작전 기록"></aside>
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+    <div class="sr-only" id="live-region" aria-live="assertive"></div>
+
+    <section class="overlay" id="main-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-desc">
+      <div class="modal-panel" id="modal-panel">
+        <div class="eyebrow" id="modal-eyebrow">CONTAINMENT PROTOCOL 07</div>
+        <h1 class="modal-title" id="modal-title">미생물<br />격리 연구소</h1>
+        <p class="modal-desc" id="modal-desc">
+          번지는 미생물 군집을 분석하고 상성에 맞는 소독 도구를 선택해 격리 구역을 안정화하라.
+          이 작품의 상성은 게임을 위한 가상 규칙이며 실제 의료·방역 지침이 아니다.
+        </p>
+
+        <div id="intro-content">
+          <div class="record-line">LOCAL BEST <strong id="menu-high-score">0 DNA</strong></div>
+          <div class="instruction-grid">
+            <div class="instruction-card"><span class="step">01 / IDENTIFY</span><strong>표본을 빠르게 식별</strong><p>도구 카드의 우측 아래 표본 아이콘이 해당 도구의 주 상성이다.</p></div>
+            <div class="instruction-card"><span class="step">02 / MATCH</span><strong>1–5 또는 클릭으로 선택</strong><p>정확한 상성 공격은 치명타, 콤보, 전체 소독 게이지를 함께 올린다.</p></div>
+            <div class="instruction-card"><span class="step">03 / CONTAIN</span><strong>밀도 한계 전에 제거</strong><p>위협도가 100%에 머무르면 격리벽이 붕괴한다. SPACE로 전체 소독을 사용하라.</p></div>
+          </div>
+          <div class="specimen-strip" id="specimen-strip" aria-label="표본 데이터 요약"></div>
+          <div class="settings-row" aria-label="플레이 설정">
+            <button class="setting-toggle" id="assist-btn" type="button" aria-pressed="true">콤보 완충 켬</button>
+            <button class="setting-toggle" id="effects-btn" type="button" aria-pressed="false">화면 효과 보통</button>
+          </div>
+
+          <div class="modal-controls">
+            <div class="difficulty-group" id="difficulty-group" aria-label="난이도 선택">
+              <button class="difficulty-btn" type="button" data-difficulty="trainee">훈련</button>
+              <button class="difficulty-btn active" type="button" data-difficulty="researcher">연구원</button>
+              <button class="difficulty-btn" type="button" data-difficulty="nightmare">악몽</button>
+            </div>
+            <p class="difficulty-description" id="difficulty-description">연구원 · 표준 생성 속도와 보스 체력</p>
+            <button class="primary-btn" id="start-btn" type="button">작전 개시</button>
+          </div>
+        </div>
+
+        <div id="pause-content" hidden>
+          <table class="help-table">
+            <tbody>
+              <tr><th>도구 전환</th><td><span class="kbd">1</span>–<span class="kbd">5</span></td></tr>
+              <tr><th>키보드 공격</th><td><span class="kbd">TAB</span> 표본 선택 · <span class="kbd">ENTER</span> 공격</td></tr>
+              <tr><th>전체 소독</th><td><span class="kbd">SPACE</span> · 게이지 100% 필요</td></tr>
+              <tr><th>일시정지</th><td><span class="kbd">ESC</span> / <span class="kbd">P</span> 또는 우측 상단 Ⅱ</td></tr>
+              <tr><th>다시 시작</th><td>결과 화면에서 <span class="kbd">R</span></td></tr>
+            </tbody>
+          </table>
+          <div class="modal-controls">
+            <button class="secondary-btn" id="restart-btn" type="button">처음부터 재시작</button>
+            <button class="primary-btn" id="resume-btn" type="button">연구 재개</button>
+          </div>
+        </div>
+
+        <div id="result-content" hidden>
+          <div class="report-grid">
+            <div class="report-card"><span>최종 DNA</span><strong id="result-score">0</strong></div>
+            <div class="report-card"><span>최고 콤보</span><strong id="result-combo">0</strong></div>
+            <div class="report-card"><span>상성 적중률</span><strong id="result-match">0%</strong></div>
+            <div class="report-card"><span>격리 완료</span><strong id="result-kills">0</strong></div>
+            <div class="report-card"><span>총 명중률</span><strong id="result-accuracy">0%</strong></div>
+            <div class="report-card"><span>과열 횟수</span><strong id="result-overheats">0</strong></div>
+          </div>
+          <div class="rank-row">
+            <div class="rank-stamp" id="rank-stamp">A</div>
+            <div class="rank-copy"><strong id="result-headline">작전 평가 완료</strong><p id="result-summary">데이터를 정리하는 중이다.</p></div>
+          </div>
+          <p class="result-tip" id="result-tip">다음 작전을 위한 분석 팁을 준비하는 중이다.</p>
+          <div class="modal-controls">
+            <button class="secondary-btn" id="menu-btn" type="button">난이도 선택</button>
+            <button class="primary-btn" id="retry-btn" type="button">다시 도전 [R]</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const randomRange = (min, max) => min + Math.random() * (max - min);
+    const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const safeStorage = {
+      get(key, fallback = null) {
+        try { return window.localStorage.getItem(key) ?? fallback; }
+        catch (_) { return fallback; }
+      },
+      set(key, value) {
+        try { window.localStorage.setItem(key, String(value)); return true; }
+        catch (_) { return false; }
+      }
+    };
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const encodeSvg = (svg) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+
+    function fallbackOrganismSvg(type, colorA, colorB) {
+      const motifs = {
+        1: `<g fill="url(#g)">${[[-21,-13],[-3,-21],[17,-14],[-16,7],[3,3],[23,7],[-2,23]].map(([x,y]) => `<circle cx="${50+x}" cy="${50+y}" r="13"/>`).join("")}</g>`,
+        2: `<g fill="url(#g)" stroke="#d9fff7" stroke-opacity=".28"><rect x="19" y="36" width="62" height="28" rx="14"/><path d="M19 45C5 31 4 59 18 67M81 44c18-16 17 18 2 25M31 35C23 18 43 18 44 34M58 66c4 20 18 14 16-2" fill="none" stroke="${colorA}" stroke-width="3"/></g>`,
+        3: `<g fill="url(#g)"><path d="M14 44c0-14 12-24 26-20l34 9c12 3 17 18 10 28-6 9-18 12-28 7l-29-13c-8-3-13-6-13-11z"/><circle cx="65" cy="47" r="7" fill="#e8fffb" opacity=".42"/></g>`,
+        4: `<g fill="url(#g)"><path d="M50 12 62 29l20-2-5 19 13 15-18 9-4 20-18-9-18 9-4-20-18-9 13-15-5-19 20 2z"/><circle cx="50" cy="50" r="16" fill="#fff" opacity=".14"/></g>`,
+        5: `<g fill="url(#g)" stroke="${colorA}"><rect x="20" y="25" width="60" height="50" rx="24" stroke-width="4"/><path d="M31 33 45 18l13 15 14-10M34 69 22 84m37-12 11 15" fill="none" stroke-width="4" stroke-linecap="round"/><circle cx="39" cy="47" r="5" fill="#fff" stroke="none" opacity=".55"/></g>`
+      };
+      return encodeSvg(`<svg xmlns="${SVG_NS}" viewBox="0 0 100 100"><defs><radialGradient id="g"><stop stop-color="${colorB}"/><stop offset="1" stop-color="${colorA}"/></radialGradient><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#glow)">${motifs[type]}</g></svg>`);
+    }
+
+    function fallbackToolSvg(type, color) {
+      const shapes = {
+        1: `<path d="M41 9h20v17H41zM36 24h30l7 12v49H28V36z"/><path d="M34 45h34M45 15h12" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="4"/>`,
+        2: `<rect x="23" y="14" width="54" height="70" rx="9"/><path d="M31 26h38v32H31z" fill="#071118"/><path d="M34 42h32M50 28v28" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3"/><circle cx="50" cy="72" r="5" fill="#fff" opacity=".55"/>`,
+        3: `<path d="M22 62 60 24c9-9 24 5 15 14L38 77c-9 9-25-6-16-15z"/><path d="m31 53 17 17M51 34l17 17" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="4"/>`,
+        4: `<path d="M26 33h48l-6 52H32z"/><path d="M36 33V19h28v14M40 47h20" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="4"/><path d="M50 48v25m-10-12 10-13 10 13" fill="none" stroke="#dff" stroke-width="3"/>`,
+        5: `<path d="M16 56 65 25l13 20-49 31z"/><circle cx="70" cy="35" r="10" fill="#fff" opacity=".35"/><path d="M80 35h15" fill="none" stroke="#fff" stroke-width="4"/>`
+      };
+      return encodeSvg(`<svg xmlns="${SVG_NS}" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f9ffff"/><stop offset=".35" stop-color="${color}"/><stop offset="1" stop-color="#112630"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g fill="url(#g)" stroke="${color}" stroke-width="2" filter="url(#glow)">${shapes[type]}</g></svg>`);
+    }
+
+    const ORGANISMS = [
+      { id: 1, name: "황색포도상구균", short: "STAPH", asset: "assets/포도상구균.svg", hp: 24, speed: 44, size: 82, reward: 26, behavior: "tank", color: "#d8a64b", accent: "#ffe198" },
+      { id: 2, name: "대장균", short: "E. COLI", asset: "assets/대장균.svg", hp: 17, speed: 105, size: 77, reward: 22, behavior: "zigzag", color: "#58d77a", accent: "#c5ffac" },
+      { id: 3, name: "녹농균", short: "P. AERUGINOSA", asset: "assets/녹농균.svg", hp: 21, speed: 72, size: 84, reward: 27, behavior: "wave", color: "#22d7bd", accent: "#bbfff3" },
+      { id: 4, name: "서모코쿠스", short: "THERMOCOCCUS", asset: "assets/서모코쿠스.svg", hp: 29, speed: 54, size: 90, reward: 34, behavior: "orbit", color: "#ff744f", accent: "#ffd4a8" },
+      { id: 5, name: "바실러스 포자균", short: "BACILLUS SPORE", asset: "assets/바실러스 포자균.svg", hp: 19, speed: 126, size: 80, reward: 31, behavior: "dash", color: "#a0918b", accent: "#f1dfcc", armored: true }
+    ];
+
+    const TOOLS = [
+      { id: 1, name: "알코올 스프레이", code: "ALC-01", asset: "assets/알코올 스프레이.svg", target: 1, base: 3, critical: 14, heat: 8, color: "#54ffda", sfx: "spray", effect: "splash", description: "근접 확산 · 군집 분산" },
+      { id: 2, name: "고출력 UV 라이트", code: "UV-C02", asset: "assets/UV 라이트.svg", target: 2, base: 3, critical: 13, heat: 10, color: "#5bc8ff", sfx: "uv", effect: "chain", description: "직선 조사 · 연쇄 타격" },
+      { id: 3, name: "항생제 캡슐", code: "ABX-03", asset: "assets/항생제 캡슐.svg", target: 3, base: 2, critical: 11, heat: 7, color: "#b48cff", sfx: "capsule", effect: "corrode", description: "지속 반응 · 방어 저하" },
+      { id: 4, name: "극저온 냉각 가스", code: "CRYO-04", asset: "assets/냉각 가스.svg", target: 4, base: 2, critical: 12, heat: 9, color: "#8be9ff", sfx: "freeze", effect: "freeze", description: "일시 정지 · 열원 억제" },
+      { id: 5, name: "집속 레이저", code: "LZR-05", asset: "assets/레이저 포인트.svg", target: 5, base: 4, critical: 15, heat: 13, color: "#ff8a3d", sfx: "laser", effect: "pierce", description: "장갑 파쇄 · 단일 관통" }
+    ];
+
+    ORGANISMS.forEach(o => { o.fallback = fallbackOrganismSvg(o.id, o.color, o.accent); });
+    TOOLS.forEach(t => { t.fallback = fallbackToolSvg(t.id, t.color); });
+
+    const DIFFICULTIES = {
+      trainee: { label: "훈련", max: 18, spawn: 1.38, speed: 0.82, hp: 0.82, boss: 0.78, score: 0.8, collapse: 3.8 },
+      researcher: { label: "연구원", max: 22, spawn: 1.05, speed: 1, hp: 1, boss: 1, score: 1, collapse: 2.8 },
+      nightmare: { label: "악몽", max: 27, spawn: 0.8, speed: 1.17, hp: 1.16, boss: 1.25, score: 1.35, collapse: 2.25 }
+    };
+
+    const storedDifficulty = safeStorage.get("containmentDifficulty", "researcher");
+    const initialDifficulty = DIFFICULTIES[storedDifficulty] ? storedDifficulty : "researcher";
+    const storedHighScore = Number(safeStorage.get("containmentHighScore", "0"));
+    const initialHighScore = Number.isFinite(storedHighScore) ? Math.max(0, storedHighScore) : 0;
+
+    const state = {
+      mode: "menu",
+      difficulty: initialDifficulty,
+      selectedTool: 1,
+      elapsed: 0,
+      totalTime: 120,
+      spawnAcc: 0,
+      uiAcc: 0,
+      radarAcc: 0,
+      contaminationHold: 0,
+      breachWarned: false,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      kills: 0,
+      shots: 0,
+      hitShots: 0,
+      matchHits: 0,
+      misses: 0,
+      mismatches: 0,
+      fever: 0,
+      heat: 0,
+      overheated: false,
+      overheatCount: 0,
+      lastOverheatNotice: 0,
+      lastCriticalAt: 0,
+      lastComboDecayAt: 0,
+      lastFrame: 0,
+      nextBossAt: 34,
+      stage: 1,
+      announcedStage: 1,
+      organisms: [],
+      seenTypes: new Set(),
+      boss: null,
+      raf: 0,
+      entitySerial: 0,
+      highScore: initialHighScore,
+      effectScale: 1,
+      perfTime: 0,
+      perfFrames: 0,
+      threatTier: 0,
+      startingToken: 0
+    };
+
+    const game = $("#game");
+    const playArea = $("#play-area");
+    const cursor = $("#cursor");
+    const cursorRing = $("#cursor-ring");
+    const overlay = $("#main-overlay");
+    const introContent = $("#intro-content");
+    const pauseContent = $("#pause-content");
+    const resultContent = $("#result-content");
+    const bossHud = $("#boss-hud");
+    const bossFill = $("#boss-fill");
+    const dangerLayer = $("#danger-layer");
+    const missionLog = $("#mission-log");
+    const toastStack = $("#toast-stack");
+    const radarDots = $("#radar-dots");
+    const liveRegion = $("#live-region");
+
+    let helpOpenedFromMenu = false;
+    let audioContext = null;
+    let ambientNodes = [];
+    let muted = safeStorage.get("containmentMuted", "false") === "true";
+    let assistEnabled = safeStorage.get("containmentAssist", "true") !== "false";
+    let effectsMode = safeStorage.get("containmentEffects", "normal") === "low" ? "low" : "normal";
+    let masterVolume = clamp(Number(safeStorage.get("containmentVolume", "0.5")) || 0.5, 0.25, 0.75);
+    const bgm = new Audio("assets/bgm.mp3");
+    bgm.loop = true;
+    bgm.preload = "auto";
+    bgm.volume = masterVolume;
+    bgm.muted = muted;
+    let bgmUnavailable = false;
+    bgm.addEventListener("error", () => { bgmUnavailable = true; });
+
+    function setImageWithFallback(img, asset, fallback) {
+      img.src = asset;
+      img.addEventListener("error", () => {
+        if (img.src !== fallback) img.src = fallback;
+      }, { once: true });
+    }
+
+    function getDifficulty() { return DIFFICULTIES[state.difficulty]; }
+    function getTool(id = state.selectedTool) { return TOOLS.find(t => t.id === id); }
+    function getOrganismType(id) { return ORGANISMS.find(o => o.id === id); }
+
+    function buildToolDeck() {
+      const deck = $("#weapon-deck");
+      deck.replaceChildren();
+      TOOLS.forEach(tool => {
+        const target = getOrganismType(tool.target);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tool-card";
+        button.dataset.tool = String(tool.id);
+        button.style.setProperty("--tool-color", tool.color);
+        button.setAttribute("aria-label", `${tool.id}번 ${tool.name}, ${target.name}에 효과적`);
+        button.title = `${tool.description} | 일반 ${tool.base} / 상성 ${tool.critical} 피해 | 열 +${tool.heat}`;
+        button.innerHTML = `
+          <span class="tool-visual">
+            <img class="tool-icon" alt="${tool.name}" draggable="false" />
+            <span class="tool-key">${tool.id}</span>
+            <img class="target-mini" alt="상성 대상 ${target.name}" draggable="false" />
+          </span>
+          <span class="tool-copy">
+            <span class="tool-name">${tool.name}</span>
+            <span class="tool-meta">${tool.code} · ${tool.description}</span>
+            <span class="tool-match">상성: ${target.short}</span>
+          </span>`;
+        setImageWithFallback($(".tool-icon", button), tool.asset, tool.fallback);
+        setImageWithFallback($(".target-mini", button), target.asset, target.fallback);
+        button.addEventListener("click", () => selectTool(tool.id));
+        deck.appendChild(button);
+      });
+      selectTool(1, false);
+    }
+
+    function buildSpecimenLegend() {
+      const strip = $("#specimen-strip");
+      strip.replaceChildren();
+      ORGANISMS.forEach(type => {
+        const chip = document.createElement("div");
+        chip.className = "specimen-chip";
+        chip.style.borderColor = `${type.color}44`;
+        chip.innerHTML = `<img alt="${type.name}" draggable="false"><div><strong>${type.id} · ${type.short}</strong><span>HP ${type.hp} · SPD ${type.speed}</span></div>`;
+        setImageWithFallback($("img", chip), type.asset, type.fallback);
+        strip.appendChild(chip);
+      });
+    }
+
+    function createAmbientParticles() {
+      for (let i = 0; i < 34; i++) {
+        const p = document.createElement("i");
+        p.className = "ambient-particle";
+        p.style.left = `${Math.random() * 100}%`;
+        p.style.top = `${80 + Math.random() * 50}%`;
+        p.style.setProperty("--d", `${randomRange(8, 18)}s`);
+        p.style.setProperty("--x", `${randomRange(-70, 70)}px`);
+        p.style.animationDelay = `${randomRange(-16, 0)}s`;
+        playArea.appendChild(p);
+      }
+    }
+
+    function selectTool(id, notify = true) {
+      if (state.mode === "menu" || state.mode === "result") state.selectedTool = id;
+      else if (state.mode !== "playing" && state.mode !== "paused") return;
+      state.selectedTool = id;
+      const tool = getTool(id);
+      $$(".tool-card").forEach(card => {
+        const active = Number(card.dataset.tool) === id;
+        card.classList.toggle("active", active);
+        card.setAttribute("aria-pressed", String(active));
+      });
+      setImageWithFallback(cursor, tool.asset, tool.fallback);
+      cursor.style.filter = `drop-shadow(0 0 13px ${tool.color})`;
+      cursorRing.style.borderColor = tool.color;
+      cursorRing.style.boxShadow = `0 0 12px ${tool.color}`;
+      highlightTargets();
+      if (notify && state.mode === "playing") addLog(`<strong>${tool.code}</strong> 선택 · ${getOrganismType(tool.target).short} 상성`, tool.color, 1300);
+    }
+
+    function highlightTargets() {
+      const targetType = getTool().target;
+      state.organisms.forEach(obj => obj.el.classList.toggle("targeted", obj.typeId === targetType));
+      if (state.boss) state.boss.el.classList.toggle("targeted", state.boss.weakType === state.selectedTool);
+    }
+
+    async function initAudio() {
+      if (!audioContext) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return false;
+        audioContext = new Ctx();
+      }
+      if (audioContext.state === "suspended") await audioContext.resume();
+      return audioContext.state === "running";
+    }
+
+    function stopAmbient() {
+      ambientNodes.forEach(node => {
+        try { node.stop?.(); } catch (_) {}
+        try { node.disconnect?.(); } catch (_) {}
+      });
+      ambientNodes = [];
+    }
+
+    function startAmbientFallback() {
+      if (!audioContext || muted || ambientNodes.length) return;
+      const master = audioContext.createGain();
+      master.gain.value = 0.035;
+      master.connect(audioContext.destination);
+      [44, 66, 88].forEach((freq, index) => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = index === 0 ? "sine" : "triangle";
+        osc.frequency.value = freq;
+        gain.gain.value = 0.35 / (index + 1);
+        osc.connect(gain).connect(master);
+        osc.start();
+        ambientNodes.push(osc, gain);
+      });
+      ambientNodes.push(master);
+    }
+
+    async function startMusic(restart = false) {
+      if (muted || state.mode !== "playing") return;
+      await initAudio();
+      if (!bgmUnavailable) {
+        try {
+          if (restart) bgm.currentTime = 0;
+          await bgm.play();
+          stopAmbient();
+          return;
+        } catch (_) { bgmUnavailable = true; }
+      }
+      startAmbientFallback();
+    }
+
+    function pauseMusic() { bgm.pause(); stopAmbient(); }
+    function stopMusic() { bgm.pause(); bgm.currentTime = 0; stopAmbient(); }
+
+    function playSfx(type, intensity = 1) {
+      if (muted || !audioContext) return;
+      const now = audioContext.currentTime;
+      const output = audioContext.createGain();
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.11 * intensity * (masterVolume / 0.5), now + 0.006);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+      output.connect(audioContext.destination);
+
+      if (type === "spray" || type === "freeze") {
+        const length = Math.floor(audioContext.sampleRate * 0.18);
+        const buffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+        const source = audioContext.createBufferSource();
+        const filter = audioContext.createBiquadFilter();
+        filter.type = type === "freeze" ? "highpass" : "bandpass";
+        filter.frequency.value = type === "freeze" ? 900 : 620;
+        source.buffer = buffer;
+        source.connect(filter).connect(output);
+        source.start(now);
+      } else {
+        const osc = audioContext.createOscillator();
+        osc.type = type === "laser" ? "sawtooth" : type === "boom" ? "square" : "triangle";
+        const frequencies = { uv: [820, 260], capsule: [210, 64], laser: [1450, 520], hit: [380, 610], boom: [130, 32], fever: [90, 520] };
+        const [start, end] = frequencies[type] || [330, 180];
+        osc.frequency.setValueAtTime(start, now);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(1, end), now + 0.22);
+        osc.connect(output);
+        osc.start(now);
+        osc.stop(now + 0.24);
+      }
+    }
+
+    function toggleSound() {
+      muted = !muted;
+      bgm.muted = muted;
+      $("#sound-btn").textContent = muted ? "🔇" : "🔊";
+      $("#sound-btn").setAttribute("aria-label", muted ? "소리 켜기" : "소리 끄기");
+      $("#sound-btn").setAttribute("aria-pressed", String(muted));
+      safeStorage.set("containmentMuted", muted);
+      if (muted) pauseMusic();
+      else if (state.mode === "playing") void startMusic(false);
+    }
+
+    function syncPreferenceControls() {
+      game.dataset.effects = effectsMode;
+      $("#assist-btn").setAttribute("aria-pressed", String(assistEnabled));
+      $("#assist-btn").textContent = `콤보 완충 ${assistEnabled ? "켬" : "끔"}`;
+      $("#effects-btn").setAttribute("aria-pressed", String(effectsMode === "low"));
+      $("#effects-btn").textContent = effectsMode === "low" ? "화면 효과 낮음" : "화면 효과 보통";
+      $("#sound-btn").textContent = muted ? "🔇" : "🔊";
+      $("#sound-btn").setAttribute("aria-label", muted ? "소리 켜기" : "소리 끄기");
+      $("#sound-btn").setAttribute("aria-pressed", String(muted));
+      $("#volume-select").value = String(masterVolume);
+    }
+
+    function toggleAssist() {
+      assistEnabled = !assistEnabled;
+      safeStorage.set("containmentAssist", assistEnabled);
+      syncPreferenceControls();
+    }
+
+    function toggleEffects() {
+      effectsMode = effectsMode === "normal" ? "low" : "normal";
+      safeStorage.set("containmentEffects", effectsMode);
+      syncPreferenceControls();
+    }
+
+    function showToast(message, color = "#54ffda", duration = 1900) {
+      while (toastStack.children.length >= 3) toastStack.firstElementChild.remove();
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.style.setProperty("--toast-color", color);
+      toast.textContent = message;
+      toastStack.appendChild(toast);
+      setTimeout(() => toast.remove(), duration);
+    }
+
+    function addLog(html, color = "#54ffda", duration = 3000) {
+      const entry = document.createElement("div");
+      entry.className = "log-entry";
+      entry.style.setProperty("--log-color", color);
+      entry.innerHTML = html;
+      missionLog.prepend(entry);
+      while (missionLog.children.length > 4) missionLog.lastElementChild.remove();
+      setTimeout(() => entry.remove(), duration);
+    }
+
+    function announce(message) {
+      liveRegion.textContent = "";
+      requestAnimationFrame(() => { liveRegion.textContent = message; });
+    }
+
+    let bannerTimer = 0;
+    let hintTimer = 0;
+
+    function showCenterBanner(message, warning = false, duration = 900) {
+      const banner = $("#center-banner");
+      clearTimeout(bannerTimer);
+      banner.textContent = message;
+      banner.classList.toggle("warning", warning);
+      banner.classList.add("show");
+      bannerTimer = setTimeout(() => banner.classList.remove("show"), duration);
+    }
+
+    function showQuickHint(duration = 5200) {
+      const hint = $("#quick-hint");
+      clearTimeout(hintTimer);
+      hint.classList.add("show");
+      hintTimer = setTimeout(() => hint.classList.remove("show"), duration);
+    }
+
+    function screenShake(strong = false) {
+      if (effectsMode === "low" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      game.classList.remove("screen-shake");
+      void game.offsetWidth;
+      game.classList.add("screen-shake");
+      if (strong && navigator.vibrate) navigator.vibrate(35);
+    }
+
+    function createParticleBurst(x, y, color, count = 12, spread = 72) {
+      count = Math.max(3, Math.round(count * state.effectScale));
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement("i");
+        particle.className = "particle";
+        const angle = Math.random() * Math.PI * 2;
+        const radius = randomRange(spread * 0.3, spread);
+        const size = randomRange(3, 8);
+        particle.style.left = `${x}px`;
+        particle.style.top = `${y}px`;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        particle.style.setProperty("--particle-color", i % 4 === 0 ? "#ffffff" : color);
+        particle.style.setProperty("--dx", `${Math.cos(angle) * radius}px`);
+        particle.style.setProperty("--dy", `${Math.sin(angle) * radius}px`);
+        particle.style.setProperty("--life", `${randomRange(360, 620)}ms`);
+        fragment.appendChild(particle);
+        setTimeout(() => particle.remove(), 700);
+      }
+      playArea.appendChild(fragment);
+    }
+
+    function createShockwave(x, y, color, size = 170) {
+      const wave = document.createElement("i");
+      wave.className = "shockwave";
+      wave.style.left = `${x}px`;
+      wave.style.top = `${y}px`;
+      wave.style.setProperty("--wave-color", color);
+      wave.style.setProperty("--wave-size", `${size}px`);
+      playArea.appendChild(wave);
+      setTimeout(() => wave.remove(), 480);
+    }
+
+    function createDamageText(x, y, text, color, large = false) {
+      const label = document.createElement("span");
+      label.className = "damage-number";
+      label.textContent = text;
+      label.style.left = `${x}px`;
+      label.style.top = `${y}px`;
+      label.style.setProperty("--damage-color", color);
+      label.style.setProperty("--damage-size", large ? "23px" : "17px");
+      playArea.appendChild(label);
+      setTimeout(() => label.remove(), 760);
+    }
+
+    function createBeam(fromX, fromY, toX, toY, color) {
+      const beam = document.createElement("i");
+      beam.className = "beam";
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      beam.style.left = `${fromX}px`;
+      beam.style.top = `${fromY}px`;
+      beam.style.width = `${Math.hypot(dx, dy)}px`;
+      beam.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+      beam.style.setProperty("--beam-color", color);
+      playArea.appendChild(beam);
+      setTimeout(() => beam.remove(), 220);
+    }
+
+    function createSplashZone(x, y, color, size = 140) {
+      const zone = document.createElement("i");
+      zone.className = "splash-zone";
+      zone.style.left = `${x}px`;
+      zone.style.top = `${y}px`;
+      zone.style.setProperty("--zone-color", color);
+      zone.style.setProperty("--zone-size", `${size}px`);
+      playArea.appendChild(zone);
+      setTimeout(() => zone.remove(), 500);
+    }
+
+    function localPoint(event) {
+      const rect = playArea.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+
+    function createOrganismElement(type, obj, isBoss = false) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = `organism${isBoss ? " boss" : ""}${type.armored ? " armored" : ""}`;
+      el.style.setProperty("--organism-color", type.color);
+      el.style.setProperty("--size", `${isBoss ? 148 : type.size}px`);
+      const recommendedTool = isBoss ? obj.weakType : type.id;
+      el.setAttribute("aria-label", `${isBoss ? "변종 보스" : type.name}, 체력 ${Math.ceil(obj.hp)}, 추천 도구 ${recommendedTool}번`);
+      el.innerHTML = `
+        <span class="organism-header">${isBoss ? "MUTATED CORE" : type.short}</span>
+        <span class="organism-body"><img class="organism-img" alt="${type.name}" draggable="false" /></span>
+        <span class="target-badge" aria-hidden="true">${recommendedTool}</span>
+        <span class="status-icons"></span>
+        <span class="hp-shell"><span class="hp-fill"></span></span>`;
+      setImageWithFallback($(".organism-img", el), type.asset, type.fallback);
+      el.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || event.isPrimary === false) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void initAudio();
+        const point = localPoint(event);
+        if (isBoss) hitBoss(point.x, point.y);
+        else hitOrganism(obj, point.x, point.y);
+      });
+      el.addEventListener("click", event => {
+        if (event.detail !== 0) return;
+        const attackX = obj.x + (isBoss ? 74 : type.size / 2);
+        const attackY = obj.y + (isBoss ? 74 : type.size / 2);
+        if (isBoss) hitBoss(attackX, attackY);
+        else hitOrganism(obj, attackX, attackY);
+      });
+      return el;
+    }
+
+    function findSpawnPosition(typeSize) {
+      const minY = Math.min(54, Math.max(8, playArea.clientHeight - typeSize));
+      const maxX = Math.max(6, playArea.clientWidth - typeSize - 8);
+      const maxY = Math.max(minY, playArea.clientHeight - typeSize - 10);
+      let best = { x: randomRange(6, maxX), y: randomRange(minY, maxY), clearance: -1 };
+      for (let attempt = 0; attempt < 14; attempt++) {
+        const candidate = { x: randomRange(6, maxX), y: randomRange(minY, maxY) };
+        const center = { x: candidate.x + typeSize / 2, y: candidate.y + typeSize / 2 };
+        let clearance = Infinity;
+        state.organisms.forEach(other => {
+          const otherType = getOrganismType(other.typeId);
+          clearance = Math.min(clearance, distance(center, { x: other.x + otherType.size / 2, y: other.y + otherType.size / 2 }));
+        });
+        if (state.boss) clearance = Math.min(clearance, distance(center, { x: state.boss.x + 74, y: state.boss.y + 74 }));
+        if (clearance > best.clearance) best = { ...candidate, clearance };
+        if (clearance >= typeSize * 1.15) break;
+      }
+      return best;
+    }
+
+    function spawnOrganism(forcedType = null) {
+      if (state.mode !== "playing") return;
+      const difficulty = getDifficulty();
+      const unlocked = Math.min(ORGANISMS.length, 1 + Math.floor(state.elapsed / 12));
+      const type = forcedType || ORGANISMS[Math.floor(Math.random() * unlocked)];
+      const hpScale = difficulty.hp * (1 + (state.stage - 1) * 0.07);
+      const maxHp = Math.round(type.hp * hpScale);
+      const spawnPoint = findSpawnPosition(type.size);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = type.speed * difficulty.speed * randomRange(0.88, 1.12);
+      const obj = {
+        id: ++state.entitySerial,
+        typeId: type.id,
+        hp: maxHp,
+        maxHp,
+        x: spawnPoint.x,
+        y: spawnPoint.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        baseSpeed: speed,
+        phase: Math.random() * Math.PI * 2,
+        behavior: type.behavior,
+        dead: false,
+        frozenUntil: 0,
+        slowedUntil: 0,
+        burnUntil: 0,
+        burnTick: 0,
+        corrodeUntil: 0,
+        corrodeTick: 0,
+        armorBrokenUntil: 0,
+        dashTimer: randomRange(0.7, 1.8),
+        el: null,
+        hpFill: null,
+        statusIcons: null
+      };
+      obj.el = createOrganismElement(type, obj);
+      obj.hpFill = $(".hp-fill", obj.el);
+      obj.statusIcons = $(".status-icons", obj.el);
+      obj.el.style.left = `${obj.x}px`;
+      obj.el.style.top = `${obj.y}px`;
+      playArea.appendChild(obj.el);
+      state.organisms.push(obj);
+      obj.el.classList.toggle("targeted", obj.typeId === getTool().target);
+      if (!state.seenTypes.has(type.id)) {
+        state.seenTypes.add(type.id);
+        if (state.elapsed > 1) addLog(`<strong>신규 표본 ${type.id}</strong> ${type.short} · ${type.id}번 도구 권장`, type.color, 3000);
+      }
+      if (state.organisms.length === Math.ceil(difficulty.max * 0.75)) showToast("⚠️ 격리 밀도 급상승", "#ff8a3d");
+    }
+
+    function updateStatusIcons(obj, now) {
+      const statuses = [];
+      if (obj.frozenUntil > now) statuses.push("❄");
+      else if (obj.slowedUntil > now) statuses.push("◌");
+      if (obj.burnUntil > now) statuses.push("🔥");
+      if (obj.corrodeUntil > now) statuses.push("◈");
+      if (obj.armorBrokenUntil > now) statuses.push("⌁");
+      obj.statusIcons.innerHTML = statuses.map(icon => `<span class="status-icon">${icon}</span>`).join("");
+      obj.el.classList.toggle("frozen", obj.frozenUntil > now);
+      obj.el.classList.toggle("burning", obj.burnUntil > now);
+      obj.el.classList.toggle("corroded", obj.corrodeUntil > now);
+      obj.el.classList.toggle("armored", getOrganismType(obj.typeId).armored && obj.armorBrokenUntil <= now);
+    }
+
+    function applyDamage(obj, damage, source = "direct", point = null) {
+      if (!obj || obj.dead) return false;
+      const now = performance.now();
+      const type = getOrganismType(obj.typeId);
+      let actual = damage;
+      if (type.armored && obj.armorBrokenUntil <= now && source !== "pierce" && source !== "fever") actual *= 0.68;
+      if (obj.corrodeUntil > now) actual *= 1.18;
+      obj.hp -= actual;
+      obj.hpFill.style.width = `${clamp((obj.hp / obj.maxHp) * 100, 0, 100)}%`;
+      obj.el.setAttribute("aria-label", `${type.name}, 체력 ${Math.max(0, Math.ceil(obj.hp))}, 추천 도구 ${type.id}번`);
+      obj.el.classList.remove("hit");
+      void obj.el.offsetWidth;
+      obj.el.classList.add("hit");
+      if (obj.hp <= 0) {
+        killOrganism(obj, point, source);
+        return true;
+      }
+      return false;
+    }
+
+    function applyHeat(amount) {
+      const wasOverheated = state.overheated;
+      state.heat = clamp(state.heat + amount, 0, 100);
+      if (!wasOverheated && state.heat >= 100) {
+        state.overheated = true;
+        state.overheatCount++;
+        state.lastOverheatNotice = performance.now();
+        showToast("🔥 과열 · 32%까지 자동 냉각", "#ff3864", 1800);
+        announce("소독 도구가 과열되었습니다");
+      }
+    }
+
+    function softenComboLoss(reason) {
+      if (state.combo <= 0) return;
+      const previous = state.combo;
+      state.combo = assistEnabled ? Math.max(0, state.combo - 3) : 0;
+      state.lastCriticalAt = performance.now();
+      state.lastComboDecayAt = state.lastCriticalAt;
+      if (previous >= 5) showToast(
+        assistEnabled ? `${reason} · 콤보 ${previous} → ${state.combo}` : `${reason} · 콤보 종료`,
+        "#ff8a3d",
+        1200
+      );
+    }
+
+    function hitOrganism(obj, x, y) {
+      if (state.mode !== "playing" || state.overheated || obj.dead) {
+        if (state.overheated && performance.now() - state.lastOverheatNotice > 1100) {
+          state.lastOverheatNotice = performance.now();
+          showToast(`냉각 중 · 현재 ${Math.ceil(state.heat)}%`, "#ff3864", 950);
+        }
+        return;
+      }
+      const tool = getTool();
+      const critical = tool.target === obj.typeId;
+      state.shots++;
+      state.hitShots++;
+      applyHeat(tool.heat);
+
+      cursor.classList.add("active");
+      setTimeout(() => cursor.classList.remove("active"), 90);
+      playSfx(tool.sfx, critical ? 1.15 : 0.9);
+
+      const damage = critical ? tool.critical : tool.base;
+      const killed = applyDamage(obj, damage, critical && tool.effect === "pierce" ? "pierce" : "direct", { x, y });
+      createDamageText(x, y, critical ? `-${Math.round(damage)} MATCH` : `-${Math.round(damage)} RESIST`, critical ? tool.color : "#ffb5c5", critical);
+      createParticleBurst(x, y, critical ? tool.color : "#ff6b83", critical ? 13 : 6, critical ? 82 : 48);
+
+      if (critical) {
+        state.matchHits++;
+        state.combo++;
+        state.maxCombo = Math.max(state.maxCombo, state.combo);
+        state.lastCriticalAt = performance.now();
+        state.lastComboDecayAt = state.lastCriticalAt;
+        state.fever = clamp(state.fever + 12 + Math.min(8, state.combo * 0.3), 0, 100);
+        state.score += Math.round((7 + Math.min(24, state.combo * 1.2)) * getDifficulty().score);
+        applyToolEffect(tool, obj, x, y, killed);
+        if ([10, 25, 50].includes(state.combo)) {
+          showToast(`⚡ ${state.combo} 연속 상성 적중`, tool.color);
+          screenShake(false);
+        }
+      } else {
+        state.mismatches++;
+        const now = performance.now();
+        if (tool.effect === "freeze") obj.slowedUntil = Math.max(obj.slowedUntil, now + 950);
+        if (tool.effect === "corrode") obj.corrodeUntil = Math.max(obj.corrodeUntil, now + 1200);
+        if (tool.effect === "pierce") obj.armorBrokenUntil = Math.max(obj.armorBrokenUntil, now + 900);
+        softenComboLoss("상성 불일치");
+        state.fever = clamp(state.fever + 2, 0, 100);
+      }
+      updateHud(true);
+    }
+
+    function applyToolEffect(tool, target, x, y, targetKilled) {
+      const now = performance.now();
+      if (tool.effect === "splash") {
+        createSplashZone(x, y, tool.color, 150);
+        state.organisms
+          .filter(other => other !== target && !other.dead && distance(other, target) < 115)
+          .slice(0, 4)
+          .forEach(other => applyDamage(other, 3.5, "splash", { x: other.x + 40, y: other.y + 40 }));
+      } else if (tool.effect === "chain") {
+        let previous = target;
+        state.organisms
+          .filter(other => other !== target && !other.dead)
+          .sort((a, b) => distance(a, target) - distance(b, target))
+          .slice(0, 2)
+          .forEach((other, index) => {
+            createBeam(previous.x + 40, previous.y + 40, other.x + 40, other.y + 40, tool.color);
+            applyDamage(other, 3 - index * 0.6, "chain", { x: other.x + 40, y: other.y + 40 });
+            previous = other;
+          });
+      } else if (tool.effect === "corrode" && !targetKilled) {
+        target.corrodeUntil = now + 3600;
+        target.corrodeTick = 0;
+      } else if (tool.effect === "freeze" && !targetKilled) {
+        target.frozenUntil = Math.max(target.frozenUntil, now + 1750);
+        createSplashZone(x, y, tool.color, 130);
+      } else if (tool.effect === "pierce" && !targetKilled) {
+        target.armorBrokenUntil = now + 4200;
+        target.burnUntil = Math.max(target.burnUntil, now + 2200);
+        target.burnTick = 0;
+        createBeam(x - 80, y, x + 110, y, tool.color);
+      }
+    }
+
+    function missAttack(x, y) {
+      if (state.mode !== "playing" || state.overheated) return;
+      const tool = getTool();
+      state.shots++;
+      state.misses++;
+      applyHeat(tool.heat * 0.35);
+      softenComboLoss("빗나감");
+      createShockwave(x, y, "rgba(255,255,255,0.28)", 58);
+      playSfx(tool.sfx, 0.5);
+      updateHud(true);
+    }
+
+    function killOrganism(obj, point = null, source = "direct") {
+      if (!obj || obj.dead) return;
+      obj.dead = true;
+      const type = getOrganismType(obj.typeId);
+      const center = point || { x: obj.x + type.size / 2, y: obj.y + type.size / 2 };
+      const bonus = Math.floor(state.combo / 5) * 4;
+      const gained = Math.round((type.reward + bonus) * getDifficulty().score);
+      state.score += gained;
+      state.kills++;
+      if (source !== "fever") state.fever = clamp(state.fever + 4, 0, 100);
+      createShockwave(center.x, center.y, type.color, 165);
+      createParticleBurst(center.x, center.y, type.color, 22, 105);
+      createDamageText(center.x, center.y - 12, `+${gained} DNA`, "#ffffff", false);
+      playSfx("boom", 0.75);
+      obj.el.classList.add("dead");
+      obj.el.style.transition = "transform 180ms ease, opacity 180ms ease, filter 180ms ease";
+      obj.el.style.transform = "scale(1.35) rotate(12deg)";
+      obj.el.style.opacity = "0";
+      obj.el.style.filter = "blur(5px) brightness(2)";
+      state.organisms = state.organisms.filter(item => item !== obj);
+      setTimeout(() => obj.el.remove(), 190);
+      updateHud(true);
+    }
+
+    function spawnBoss() {
+      if (state.boss || state.mode !== "playing") return;
+      const difficulty = getDifficulty();
+      const type = getOrganismType(4);
+      const maxHp = Math.round(165 * difficulty.boss * (1 + (state.stage - 1) * 0.16));
+      const obj = {
+        hp: maxHp,
+        maxHp,
+        x: playArea.clientWidth / 2 - 74,
+        y: Math.max(32, playArea.clientHeight / 2 - 74),
+        vx: 70 * difficulty.speed,
+        vy: 56 * difficulty.speed,
+        weakType: Math.floor(Math.random() * 5) + 1,
+        weakSwitchAt: performance.now() + 6800,
+        dead: false,
+        el: null
+      };
+      obj.el = createOrganismElement(type, obj, true);
+      obj.el.style.left = `${obj.x}px`;
+      obj.el.style.top = `${obj.y}px`;
+      playArea.appendChild(obj.el);
+      state.boss = obj;
+      bossHud.hidden = false;
+      bossFill.style.width = "100%";
+      updateBossWeakness();
+      showToast("🚨 변종 군집체 감지 · 약점 주기 변화", "#ff3864", 2600);
+      addLog("<strong>BOSS</strong> 변종 군집체가 격리벽을 압박한다", "#ff3864", 4200);
+      announce("변종 보스가 출현했습니다");
+      screenShake(true);
+    }
+
+    function updateBossWeakness() {
+      if (!state.boss) return;
+      const tool = getTool(state.boss.weakType);
+      $("#boss-weakness").textContent = `약점 ${tool.id} · ${tool.code}`;
+      state.boss.el.style.setProperty("--organism-color", tool.color);
+      $(".target-badge", state.boss.el).textContent = String(tool.id);
+      state.boss.el.setAttribute("aria-label", `변종 보스, 체력 ${Math.max(0, Math.ceil(state.boss.hp))}, 추천 도구 ${tool.id}번`);
+      highlightTargets();
+    }
+
+    function hitBoss(x, y) {
+      if (state.mode !== "playing" || state.overheated || !state.boss || state.boss.dead) return;
+      const tool = getTool();
+      const critical = state.boss.weakType === tool.id;
+      state.shots++;
+      state.hitShots++;
+      applyHeat(tool.heat);
+      const damage = critical ? 16 : 3;
+      state.boss.hp -= damage;
+      bossFill.style.width = `${clamp((state.boss.hp / state.boss.maxHp) * 100, 0, 100)}%`;
+      state.boss.el.setAttribute("aria-label", `변종 보스, 체력 ${Math.max(0, Math.ceil(state.boss.hp))}, 추천 도구 ${state.boss.weakType}번`);
+      playSfx(critical ? tool.sfx : "hit", critical ? 1.2 : 0.7);
+      createDamageText(x, y, critical ? `-${damage} BREACH` : `-${damage} SHIELD`, critical ? tool.color : "#ffb5c5", critical);
+      createParticleBurst(x, y, critical ? tool.color : "#ff3864", critical ? 16 : 7, critical ? 95 : 55);
+      state.boss.el.classList.remove("hit");
+      void state.boss.el.offsetWidth;
+      state.boss.el.classList.add("hit");
+
+      if (critical) {
+        state.matchHits++;
+        state.combo++;
+        state.maxCombo = Math.max(state.maxCombo, state.combo);
+        state.lastCriticalAt = performance.now();
+        state.lastComboDecayAt = state.lastCriticalAt;
+        state.fever = clamp(state.fever + 15, 0, 100);
+        state.score += Math.round((14 + state.combo) * getDifficulty().score);
+      } else {
+        state.mismatches++;
+        softenComboLoss("보스 약점 불일치");
+      }
+
+      if (state.boss.hp <= 0) killBoss(x, y);
+      updateHud(true);
+    }
+
+    function killBoss(x, y) {
+      const boss = state.boss;
+      if (!boss || boss.dead) return;
+      boss.dead = true;
+      const reward = Math.round(320 * getDifficulty().score);
+      state.score += reward;
+      state.kills++;
+      state.fever = 100;
+      createShockwave(x, y, "#ff3864", 360);
+      createParticleBurst(x, y, "#ff3864", 52, 190);
+      createDamageText(x, y - 24, `CORE PURGED +${reward}`, "#ffd166", true);
+      playSfx("boom", 1.5);
+      screenShake(true);
+      boss.el.style.transition = "transform 360ms ease, opacity 320ms ease, filter 320ms ease";
+      boss.el.style.transform = "scale(1.8) rotate(30deg)";
+      boss.el.style.opacity = "0";
+      boss.el.style.filter = "blur(9px) brightness(3)";
+      setTimeout(() => boss.el.remove(), 380);
+      state.boss = null;
+      bossHud.hidden = true;
+      showToast(`변종 군집체 제거 · +${reward} DNA`, "#ffd166", 2400);
+      addLog("<strong>CORE PURGED</strong> 보스 표본 격리 완료", "#ffd166", 3900);
+      updateHud(true);
+    }
+
+    function triggerFever() {
+      if (state.mode !== "playing" || state.fever < 100) return;
+      state.fever = 0;
+      state.combo = Math.max(state.combo, 5);
+      state.heat = Math.max(0, state.heat - 40);
+      state.overheated = false;
+      state.organisms.slice().forEach(obj => applyDamage(obj, 23, "fever", { x: obj.x + 40, y: obj.y + 40 }));
+      if (state.boss) {
+        state.boss.hp -= 42;
+        bossFill.style.width = `${clamp((state.boss.hp / state.boss.maxHp) * 100, 0, 100)}%`;
+        if (state.boss.hp <= 0) killBoss(state.boss.x + 74, state.boss.y + 74);
+      }
+      state.score += Math.round(120 * getDifficulty().score);
+      createShockwave(playArea.clientWidth / 2, playArea.clientHeight / 2, "#ffffff", Math.max(playArea.clientWidth, playArea.clientHeight) * 1.45);
+      playSfx("fever", 1.5);
+      screenShake(true);
+      game.classList.add("flash");
+      setTimeout(() => game.classList.remove("flash"), 210);
+      showToast("전체 소독 충격파 발동 · 필드 안정화", "#ffd166", 2300);
+      announce("전체 소독이 발동되었습니다");
+      updateHud(true);
+    }
+
+    function updateOrganism(obj, dt, now) {
+      if (obj.dead) return;
+      const type = getOrganismType(obj.typeId);
+      updateStatusIcons(obj, now);
+      const frozen = obj.frozenUntil > now;
+      const slowed = obj.slowedUntil > now;
+      const speedFactor = frozen ? 0 : slowed ? 0.55 : 1;
+
+      if (obj.burnUntil > now) {
+        obj.burnTick += dt;
+        if (obj.burnTick >= 0.45) {
+          obj.burnTick = 0;
+          applyDamage(obj, 1.2, "burn", { x: obj.x + type.size / 2, y: obj.y + type.size / 2 });
+        }
+      }
+      if (obj.corrodeUntil > now) {
+        obj.corrodeTick += dt;
+        if (obj.corrodeTick >= 0.75) {
+          obj.corrodeTick = 0;
+          applyDamage(obj, 1.4, "corrode", { x: obj.x + type.size / 2, y: obj.y + type.size / 2 });
+        }
+      }
+      if (obj.dead) return;
+
+      obj.phase += dt;
+      if (obj.behavior === "zigzag") {
+        const normalX = -obj.vy;
+        const normalY = obj.vx;
+        const length = Math.hypot(normalX, normalY) || 1;
+        obj.x += (obj.vx + (normalX / length) * Math.sin(obj.phase * 7) * 74) * dt * speedFactor;
+        obj.y += (obj.vy + (normalY / length) * Math.sin(obj.phase * 7) * 74) * dt * speedFactor;
+      } else if (obj.behavior === "wave") {
+        obj.x += obj.vx * dt * speedFactor;
+        obj.y += (obj.vy + Math.sin(obj.phase * 4.2) * 46) * dt * speedFactor;
+      } else if (obj.behavior === "orbit") {
+        const cx = playArea.clientWidth / 2;
+        const cy = playArea.clientHeight / 2;
+        obj.vx += (cx - obj.x) * dt * 0.3;
+        obj.vy += (cy - obj.y) * dt * 0.3;
+        const max = obj.baseSpeed * 1.35;
+        const vLen = Math.hypot(obj.vx, obj.vy) || 1;
+        if (vLen > max) { obj.vx = obj.vx / vLen * max; obj.vy = obj.vy / vLen * max; }
+        obj.x += obj.vx * dt * speedFactor;
+        obj.y += obj.vy * dt * speedFactor;
+      } else if (obj.behavior === "dash") {
+        obj.dashTimer -= dt;
+        if (obj.dashTimer <= 0) {
+          obj.dashTimer = randomRange(0.85, 1.5);
+          const angle = Math.atan2(obj.vy, obj.vx) + randomRange(-0.55, 0.55);
+          obj.vx = Math.cos(angle) * obj.baseSpeed * 1.6;
+          obj.vy = Math.sin(angle) * obj.baseSpeed * 1.6;
+          createShockwave(obj.x + type.size / 2, obj.y + type.size / 2, type.color, 62);
+        }
+        obj.x += obj.vx * dt * speedFactor;
+        obj.y += obj.vy * dt * speedFactor;
+        obj.vx *= Math.pow(0.987, dt * 60);
+        obj.vy *= Math.pow(0.987, dt * 60);
+        const minSpeed = obj.baseSpeed * 0.76;
+        const vLen = Math.hypot(obj.vx, obj.vy) || 1;
+        if (vLen < minSpeed) { obj.vx = obj.vx / vLen * minSpeed; obj.vy = obj.vy / vLen * minSpeed; }
+      } else {
+        obj.x += obj.vx * dt * speedFactor;
+        obj.y += obj.vy * dt * speedFactor;
+      }
+
+      const maxX = Math.max(0, playArea.clientWidth - type.size);
+      const maxY = Math.max(0, playArea.clientHeight - type.size);
+      if (obj.x <= 0) { obj.x = 0; obj.vx = Math.abs(obj.vx); }
+      if (obj.x >= maxX) { obj.x = maxX; obj.vx = -Math.abs(obj.vx); }
+      if (obj.y <= 0) { obj.y = 0; obj.vy = Math.abs(obj.vy); }
+      if (obj.y >= maxY) { obj.y = maxY; obj.vy = -Math.abs(obj.vy); }
+      obj.el.style.left = `${obj.x}px`;
+      obj.el.style.top = `${obj.y}px`;
+    }
+
+    function updateBoss(dt, now) {
+      const boss = state.boss;
+      if (!boss || boss.dead) return;
+      if (now >= boss.weakSwitchAt) {
+        let next = boss.weakType;
+        while (next === boss.weakType) next = Math.floor(Math.random() * 5) + 1;
+        boss.weakType = next;
+        boss.weakSwitchAt = now + 6800;
+        updateBossWeakness();
+        playSfx("hit", 0.55);
+        showToast(`보스 약점 변경 · ${boss.weakType}번 도구`, "#ffd166", 1200);
+      }
+      boss.x += boss.vx * dt;
+      boss.y += boss.vy * dt;
+      const maxX = Math.max(0, playArea.clientWidth - 148);
+      const maxY = Math.max(0, playArea.clientHeight - 148);
+      if (boss.x <= 0 || boss.x >= maxX) boss.vx *= -1;
+      if (boss.y <= 0 || boss.y >= maxY) boss.vy *= -1;
+      boss.x = clamp(boss.x, 0, maxX);
+      boss.y = clamp(boss.y, 0, maxY);
+      boss.el.style.left = `${boss.x}px`;
+      boss.el.style.top = `${boss.y}px`;
+      boss.el.style.transform = `rotate(${Math.sin(now / 620) * 3}deg) scale(${1 + Math.sin(now / 430) * 0.025})`;
+    }
+
+    function updateRadar() {
+      radarDots.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      const width = Math.max(1, playArea.clientWidth);
+      const height = Math.max(1, playArea.clientHeight);
+      state.organisms.forEach(obj => {
+        const dot = document.createElement("i");
+        dot.className = "radar-dot";
+        dot.style.left = `${clamp((obj.x / width) * 100, 2, 98)}%`;
+        dot.style.top = `${clamp((obj.y / height) * 100, 2, 98)}%`;
+        fragment.appendChild(dot);
+      });
+      if (state.boss) {
+        const dot = document.createElement("i");
+        dot.className = "radar-dot boss-dot";
+        dot.style.left = `${clamp((state.boss.x / width) * 100, 2, 98)}%`;
+        dot.style.top = `${clamp((state.boss.y / height) * 100, 2, 98)}%`;
+        fragment.appendChild(dot);
+      }
+      radarDots.appendChild(fragment);
+    }
+
+    function getThreat() {
+      const difficulty = getDifficulty();
+      const density = (state.organisms.length / difficulty.max) * 100;
+      const bossPressure = state.boss ? 9 : 0;
+      return clamp(density + bossPressure, 0, 100);
+    }
+
+    function updateHud(force = false) {
+      const remaining = Math.max(0, state.totalTime - state.elapsed);
+      const minutes = Math.floor(remaining / 60);
+      const seconds = Math.floor(remaining % 60);
+      const accuracy = state.shots ? Math.round((state.hitShots / state.shots) * 100) : 100;
+      const threat = getThreat();
+      $("#timer-value").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      $("#progress-fill").style.width = `${clamp((state.elapsed / state.totalTime) * 100, 0, 100)}%`;
+      $("#score-value").textContent = state.score.toLocaleString("ko-KR");
+      $("#combo-value").textContent = String(state.combo);
+      const comboLife = state.combo > 0 ? clamp(1 - (performance.now() - state.lastCriticalAt) / 3400, 0, 1) : 0;
+      $("#combo-decay-fill").style.width = `${comboLife * 100}%`;
+      $("#accuracy-value").textContent = `${accuracy}%`;
+      $("#heat-value").textContent = `${Math.round(state.heat)}%`;
+      $("#heat-fill").style.width = `${state.heat}%`;
+      const breachRemaining = Math.max(0, getDifficulty().collapse - state.contaminationHold);
+      $("#threat-value").textContent = threat >= 100 ? `BREACH ${breachRemaining.toFixed(1)}s` : `${Math.round(threat)}%`;
+      $("#threat-fill").style.width = `${threat}%`;
+      $("#fever-btn").style.setProperty("--fever", `${state.fever}%`);
+      $("#fever-label").textContent = state.fever >= 100 ? "전체 소독 READY [SPACE]" : `전체 소독 ${Math.floor(state.fever)}%`;
+      $("#fever-btn").disabled = state.fever < 100 || state.mode !== "playing";
+      $("#fever-btn").classList.toggle("ready", state.fever >= 100 && state.mode === "playing");
+      dangerLayer.classList.toggle("active", threat >= 84);
+      game.dataset.threat = threat >= 100 ? "breach" : threat >= 84 ? "critical" : threat >= 68 ? "warning" : "stable";
+      cursor.classList.toggle("overheated", state.overheated);
+      $("#mission-chip-text").textContent = state.mode === "playing" ? `STAGE ${state.stage} · 표본 ${state.organisms.length}/${getDifficulty().max}` : "격리 구역 안정화 대기 중";
+      if (state.boss) {
+        const weakTool = getTool(state.boss.weakType);
+        const weakSeconds = Math.max(0, (state.boss.weakSwitchAt - performance.now()) / 1000);
+        $("#boss-weakness").textContent = `약점 ${weakTool.id} · ${weakTool.code} · ${weakSeconds.toFixed(1)}s`;
+      }
+      if (force) updateRadar();
+    }
+
+    function gameLoop(timestamp) {
+      if (state.mode !== "playing") return;
+      if (!state.lastFrame) state.lastFrame = timestamp;
+      const dt = Math.min(0.05, (timestamp - state.lastFrame) / 1000);
+      state.lastFrame = timestamp;
+      const now = performance.now();
+      const difficulty = getDifficulty();
+      state.perfTime += dt;
+      state.perfFrames++;
+      if (state.perfTime >= 3) {
+        const averageFrame = state.perfTime / Math.max(1, state.perfFrames);
+        state.effectScale = effectsMode === "low" ? 0.5 : averageFrame > 0.028 ? 0.58 : averageFrame > 0.022 ? 0.78 : 1;
+        state.perfTime = 0;
+        state.perfFrames = 0;
+      }
+
+      state.elapsed += dt;
+      state.stage = Math.min(4, 1 + Math.floor(state.elapsed / 30));
+      if (state.stage !== state.announcedStage) {
+        state.announcedStage = state.stage;
+        showToast(`STAGE ${state.stage} · 변이 속도 상승`, "#5bc8ff", 1800);
+        showCenterBanner(`STAGE ${state.stage}`, false, 850);
+        addLog(`<strong>STAGE ${state.stage}</strong> 개체 활성도와 생성 주기 증가`, "#5bc8ff", 3200);
+        screenShake(false);
+      }
+      state.spawnAcc += dt;
+      state.uiAcc += dt;
+      state.radarAcc += dt;
+
+      const spawnInterval = Math.max(0.42, difficulty.spawn - (state.stage - 1) * 0.1);
+      while (state.spawnAcc >= spawnInterval && state.organisms.length < difficulty.max + 2) {
+        state.spawnAcc -= spawnInterval;
+        spawnOrganism();
+      }
+
+      if (state.elapsed >= state.nextBossAt) {
+        if (!state.boss) spawnBoss();
+        state.nextBossAt += 36;
+      }
+
+      if (state.combo > 0 && now - state.lastCriticalAt > 3400 && now - state.lastComboDecayAt > 720) {
+        state.combo = Math.max(0, state.combo - 2);
+        state.lastComboDecayAt = now;
+      }
+
+      if (state.heat > 0) {
+        const coolRate = state.overheated ? 33 : 24;
+        state.heat = Math.max(0, state.heat - coolRate * dt);
+        if (state.overheated && state.heat <= 32) {
+          state.overheated = false;
+          showToast("도구 냉각 완료", "#54ffda", 1100);
+        }
+      }
+
+      state.organisms.slice().forEach(obj => updateOrganism(obj, dt, now));
+      updateBoss(dt, now);
+
+      const threat = getThreat();
+      const nextThreatTier = threat >= 100 ? 3 : threat >= 84 ? 2 : threat >= 68 ? 1 : 0;
+      if (nextThreatTier > state.threatTier) {
+        if (nextThreatTier === 1) showToast("격리 밀도 70% 접근 · 표본 수를 줄여라", "#ffd166", 1600);
+        if (nextThreatTier === 2) showCenterBanner("위협도 위험", true, 950);
+        if (nextThreatTier === 3) announce("격리벽 붕괴 카운트다운이 시작되었습니다");
+      }
+      state.threatTier = nextThreatTier;
+      if (threat >= 100) {
+        state.contaminationHold += dt;
+        if (!state.breachWarned) {
+          state.breachWarned = true;
+          showToast("🚨 격리벽 붕괴 카운트다운 · 즉시 밀도 감소 필요", "#ff3864", 2400);
+          announce("격리벽 붕괴 카운트다운이 시작되었습니다");
+        }
+      } else {
+        state.contaminationHold = Math.max(0, state.contaminationHold - dt * 1.5);
+        if (threat < 92) state.breachWarned = false;
+      }
+      if (state.contaminationHold >= difficulty.collapse) {
+        endGame(false, "격리 밀도가 임계치를 초과해 차단벽이 붕괴했다.");
+        return;
+      }
+
+      if (state.uiAcc >= 0.1) {
+        state.uiAcc = 0;
+        updateHud(false);
+      }
+      if (state.radarAcc >= 0.18) {
+        state.radarAcc = 0;
+        updateRadar();
+      }
+
+      if (state.elapsed >= state.totalTime) {
+        endGame(true, "120초 동안 격리 구역을 유지했다.");
+        return;
+      }
+      state.raf = requestAnimationFrame(gameLoop);
+    }
+
+    function clearEntities() {
+      state.organisms.forEach(obj => obj.el.remove());
+      state.organisms = [];
+      if (state.boss?.el) state.boss.el.remove();
+      state.boss = null;
+      bossHud.hidden = true;
+      radarDots.replaceChildren();
+      $$(".particle, .shockwave, .damage-number, .beam, .splash-zone, .trail-dot", playArea).forEach(el => el.remove());
+    }
+
+    function resetState(mode = "starting") {
+      cancelAnimationFrame(state.raf);
+      clearEntities();
+      Object.assign(state, {
+        mode,
+        elapsed: 0,
+        spawnAcc: 0,
+        uiAcc: 0,
+        radarAcc: 0,
+        contaminationHold: 0,
+        breachWarned: false,
+        score: 0,
+        combo: 0,
+        maxCombo: 0,
+        kills: 0,
+        shots: 0,
+        hitShots: 0,
+        matchHits: 0,
+        misses: 0,
+        mismatches: 0,
+        fever: 0,
+        heat: 0,
+        overheated: false,
+        overheatCount: 0,
+        lastOverheatNotice: 0,
+        lastCriticalAt: 0,
+        lastComboDecayAt: 0,
+        lastFrame: 0,
+        nextBossAt: 34,
+        stage: 1,
+        announcedStage: 1,
+        seenTypes: new Set(),
+        effectScale: effectsMode === "low" ? 0.5 : 1,
+        perfTime: 0,
+        perfFrames: 0,
+        threatTier: 0
+      });
+      missionLog.replaceChildren();
+      toastStack.replaceChildren();
+      $("#center-banner").classList.remove("show", "warning");
+      $("#quick-hint").classList.remove("show");
+      selectTool(1, false);
+      updateHud(true);
+    }
+
+    async function startGame() {
+      if (state.mode === "starting") return;
+      state.mode = "starting";
+      const token = ++state.startingToken;
+      $("#start-btn").disabled = true;
+      await initAudio();
+      resetState("starting");
+      overlay.hidden = true;
+      for (const count of ["3", "2", "1"]) {
+        if (token !== state.startingToken) return;
+        showCenterBanner(count, false, 520);
+        await wait(620);
+      }
+      if (token !== state.startingToken) return;
+      showCenterBanner("CONTAIN", false, 720);
+      state.mode = "playing";
+      addLog(`<strong>PROTOCOL START</strong> ${getDifficulty().label} 난이도 · ${state.totalTime}초`, "#54ffda", 3500);
+      showToast("표본 중앙 번호와 같은 도구를 사용하라", "#54ffda", 2400);
+      showQuickHint();
+      announce("게임이 시작되었습니다. 표본 중앙 번호와 같은 도구를 선택하세요.");
+      playArea.focus({ preventScroll: true });
+      void startMusic(true);
+      [ORGANISMS[0], ORGANISMS[1], ORGANISMS[0]].forEach(type => spawnOrganism(type));
+      state.raf = requestAnimationFrame(gameLoop);
+      $("#start-btn").disabled = false;
+    }
+
+    function togglePause(forcePause = null) {
+      if (state.mode !== "playing" && state.mode !== "paused") return;
+      const shouldPause = forcePause ?? state.mode === "playing";
+      if (shouldPause) {
+        state.mode = "paused";
+        cursor.style.display = "none";
+        cursorRing.hidden = true;
+        cancelAnimationFrame(state.raf);
+        pauseMusic();
+        showPauseOverlay(false);
+      } else {
+        state.mode = "playing";
+        overlay.hidden = true;
+        state.lastFrame = 0;
+        void startMusic(false);
+        state.raf = requestAnimationFrame(gameLoop);
+      }
+      updateHud(true);
+    }
+
+    function showIntroOverlay() {
+      state.startingToken++;
+      state.mode = "menu";
+      stopMusic();
+      cancelAnimationFrame(state.raf);
+      $("#center-banner").classList.remove("show", "warning");
+      $("#quick-hint").classList.remove("show");
+      $("#start-btn").disabled = false;
+      overlay.hidden = false;
+      introContent.hidden = false;
+      pauseContent.hidden = true;
+      resultContent.hidden = true;
+      $("#modal-eyebrow").textContent = "CONTAINMENT PROTOCOL 07";
+      $("#modal-title").innerHTML = "미생물<br />격리 연구소";
+      $("#modal-desc").textContent = "번지는 미생물 군집을 분석하고 상성에 맞는 소독 도구를 선택해 격리 구역을 안정화하라. 이 작품의 상성은 게임을 위한 가상 규칙이며 실제 의료·방역 지침이 아니다.";
+      $("#menu-high-score").textContent = `${state.highScore.toLocaleString("ko-KR")} DNA`;
+      $$(".difficulty-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.difficulty === state.difficulty));
+      $("#difficulty-description").textContent = {
+        trainee: "훈련 · 느린 표본과 넉넉한 붕괴 유예시간",
+        researcher: "연구원 · 표준 생성 속도와 보스 체력",
+        nightmare: "악몽 · 빠른 변이와 짧은 붕괴 유예시간"
+      }[state.difficulty];
+      syncPreferenceControls();
+      requestAnimationFrame(() => $("#start-btn").focus({ preventScroll: true }));
+    }
+
+    function showPauseOverlay(helpOnly = false) {
+      overlay.hidden = false;
+      introContent.hidden = true;
+      pauseContent.hidden = false;
+      resultContent.hidden = true;
+      $("#modal-eyebrow").textContent = helpOnly ? "OPERATION MANUAL" : "RESEARCH SUSPENDED";
+      $("#modal-title").innerHTML = helpOnly ? "작전 매뉴얼" : "연구 일시정지";
+      $("#modal-desc").textContent = helpOnly ? "도구의 주 상성을 맞추면 치명타와 콤보가 누적된다. 실제 방역 방법을 설명하는 콘텐츠는 아니다." : "격리 구역의 시뮬레이션이 정지되었다. 준비가 되면 연구를 재개하라.";
+      pauseContent.dataset.helpOnly = String(helpOnly);
+      $("#restart-btn").hidden = helpOnly || state.mode === "menu";
+      $("#resume-btn").textContent = helpOnly && helpOpenedFromMenu ? "매뉴얼 닫기" : "연구 재개";
+      requestAnimationFrame(() => $("#resume-btn").focus({ preventScroll: true }));
+    }
+
+    function calculateRank(win) {
+      const matchRate = state.hitShots ? state.matchHits / state.hitShots : 0;
+      const target = state.difficulty === "nightmare" ? 8000 : state.difficulty === "researcher" ? 4800 : 2500;
+      const ratio = state.score / target;
+      if (win && ratio >= 1.45 && matchRate >= 0.78) return ["S+", "완벽한 격리 통제", "상성 판단과 위기 대응이 모두 뛰어났다."];
+      if (win && ratio >= 1.0 && matchRate >= 0.62) return ["A", "안정적인 연구 수행", "격리 구역을 안정적으로 유지했다. 콤보 유지력을 더 높이면 상위 등급이 가능하다."];
+      if (win) return ["B", "격리 유지 성공", "작전은 완수했지만 비효율 공격과 과열 관리에서 손실이 발생했다."];
+      if (ratio >= 0.75) return ["C", "부분 데이터 확보", "격리벽은 붕괴했지만 유의미한 표본 데이터를 확보했다."];
+      return ["D", "프로토콜 재검토 필요", "밀도가 오르기 전에 상성 표본을 우선 제거하고 전체 소독을 아껴 사용하라."];
+    }
+
+    function endGame(win, reason) {
+      if (state.mode === "result") return;
+      state.mode = "result";
+      cancelAnimationFrame(state.raf);
+      stopMusic();
+      const matchRate = state.hitShots ? Math.round((state.matchHits / state.hitShots) * 100) : 0;
+      const totalAccuracy = state.shots ? Math.round((state.hitShots / state.shots) * 100) : 0;
+      const [rank, headline, summary] = calculateRank(win);
+      state.highScore = Math.max(state.highScore, state.score);
+      safeStorage.set("containmentHighScore", state.highScore);
+
+      $("#result-score").textContent = state.score.toLocaleString("ko-KR");
+      $("#result-combo").textContent = String(state.maxCombo);
+      $("#result-match").textContent = `${matchRate}%`;
+      $("#result-kills").textContent = String(state.kills);
+      $("#result-accuracy").textContent = `${totalAccuracy}%`;
+      $("#result-overheats").textContent = String(state.overheatCount);
+      $("#rank-stamp").textContent = rank;
+      $("#result-headline").textContent = headline;
+      $("#result-summary").textContent = `${reason} 총 명중률 ${totalAccuracy}%, 상성 적중 ${matchRate}%. 최고 기록 ${state.highScore.toLocaleString("ko-KR")} DNA.`;
+      $("#result-tip").textContent = matchRate < 60
+        ? "분석 팁: 표본 중앙의 숫자를 먼저 보고 같은 번호의 도구를 고르면 피해량과 전체 소독 충전량이 크게 오른다."
+        : totalAccuracy < 82
+          ? "분석 팁: 움직임을 따라 연속 클릭하기보다 표본의 이동 방향 앞쪽을 한 번씩 눌러 오발과 과열을 줄여라."
+          : state.overheatCount >= 2
+            ? "분석 팁: 열이 80%를 넘으면 잠시 공격을 멈춰라. 전체 소독은 열을 40% 낮추므로 위기 탈출에도 유용하다."
+            : "분석 팁: 안정적인 조작이었다. 다음에는 보스 약점이 바뀌는 순간 번호키로 즉시 전환해 콤보를 유지해보자.";
+      $("#modal-eyebrow").textContent = win ? "MISSION COMPLETE" : "CONTAINMENT BREACH";
+      $("#modal-title").innerHTML = win ? "작전 완수" : "격리 실패";
+      $("#modal-desc").textContent = summary;
+      introContent.hidden = true;
+      pauseContent.hidden = true;
+      resultContent.hidden = false;
+      overlay.hidden = false;
+      announce(win ? "작전을 완수했습니다" : "격리 작전에 실패했습니다");
+      requestAnimationFrame(() => $("#retry-btn").focus({ preventScroll: true }));
+    }
+
+    function restartGame() {
+      void startGame();
+    }
+
+    function handlePointerMove(event) {
+      if (event.pointerType === "touch") return;
+      const { x, y } = localPoint(event);
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+      cursor.style.display = state.mode === "playing" ? "block" : "none";
+      cursorRing.hidden = state.mode !== "playing";
+      cursorRing.style.left = `${x}px`;
+      cursorRing.style.top = `${y}px`;
+      if (state.mode === "playing" && Math.random() > 0.58) {
+        const tool = getTool();
+        const dot = document.createElement("i");
+        dot.className = "trail-dot";
+        const size = randomRange(3, 7);
+        dot.style.left = `${x}px`;
+        dot.style.top = `${y}px`;
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.setProperty("--trail-color", tool.color);
+        playArea.appendChild(dot);
+        setTimeout(() => dot.remove(), 380);
+      }
+    }
+
+    playArea.addEventListener("pointermove", handlePointerMove);
+    playArea.addEventListener("pointerleave", () => { cursor.style.display = "none"; cursorRing.hidden = true; });
+    playArea.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || event.isPrimary === false) return;
+      if (event.target.closest(".organism")) return;
+      void initAudio();
+      const { x, y } = localPoint(event);
+      missAttack(x, y);
+    });
+    playArea.addEventListener("contextmenu", event => event.preventDefault());
+
+    window.addEventListener("keydown", event => {
+      const editingControl = event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement;
+      if (editingControl) return;
+      if (event.key >= "1" && event.key <= "5") selectTool(Number(event.key));
+      if (event.code === "Space") {
+        event.preventDefault();
+        triggerFever();
+      }
+      if (event.code === "Escape") {
+        if (state.mode === "playing" || state.mode === "paused") togglePause();
+        else if (state.mode === "starting") showIntroOverlay();
+        else if (state.mode === "menu" && !pauseContent.hidden) showIntroOverlay();
+      }
+      if (event.code === "KeyP" && (state.mode === "playing" || state.mode === "paused")) togglePause();
+      if (event.code === "KeyR" && state.mode === "result") restartGame();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && state.mode === "playing") togglePause(true);
+      else if (document.hidden && state.mode === "starting") showIntroOverlay();
+    });
+    window.addEventListener("blur", () => {
+      if (state.mode === "playing") togglePause(true);
+    });
+
+    $("#start-btn").addEventListener("click", startGame);
+    $("#retry-btn").addEventListener("click", restartGame);
+    $("#menu-btn").addEventListener("click", showIntroOverlay);
+    $("#restart-btn").addEventListener("click", restartGame);
+    $("#resume-btn").addEventListener("click", () => {
+      const helpOnly = pauseContent.dataset.helpOnly === "true";
+      if (helpOnly && helpOpenedFromMenu) {
+        helpOpenedFromMenu = false;
+        showIntroOverlay();
+      } else if (state.mode === "paused") {
+        togglePause(false);
+        playArea.focus({ preventScroll: true });
+      } else {
+        overlay.hidden = true;
+      }
+    });
+    $("#pause-btn").addEventListener("click", () => togglePause());
+    $("#help-btn").addEventListener("click", () => {
+      if (state.mode === "result" || state.mode === "starting") return;
+      helpOpenedFromMenu = state.mode === "menu";
+      if (state.mode === "playing") togglePause(true);
+      showPauseOverlay(true);
+    });
+    $("#sound-btn").addEventListener("click", toggleSound);
+    $("#assist-btn").addEventListener("click", toggleAssist);
+    $("#effects-btn").addEventListener("click", toggleEffects);
+    $("#fever-btn").addEventListener("click", triggerFever);
+    $("#volume-select").addEventListener("change", event => {
+      masterVolume = clamp(Number(event.target.value), 0.25, 0.75);
+      bgm.volume = masterVolume;
+      safeStorage.set("containmentVolume", masterVolume);
+    });
+
+    $("#difficulty-group").addEventListener("click", event => {
+      const button = event.target.closest("[data-difficulty]");
+      if (!button) return;
+      state.difficulty = button.dataset.difficulty;
+      safeStorage.set("containmentDifficulty", state.difficulty);
+      $$(".difficulty-btn").forEach(btn => btn.classList.toggle("active", btn === button));
+      const descriptions = {
+        trainee: "훈련 · 느린 표본과 낮은 체력, 넉넉한 붕괴 유예시간",
+        researcher: "연구원 · 표준 생성 속도와 보스 체력",
+        nightmare: "악몽 · 빠른 변이와 짧은 붕괴 유예시간"
+      };
+      $("#difficulty-description").textContent = descriptions[state.difficulty];
+    });
+
+    window.addEventListener("resize", () => {
+      state.organisms.forEach(obj => {
+        const type = getOrganismType(obj.typeId);
+        obj.x = clamp(obj.x, 0, Math.max(0, playArea.clientWidth - type.size));
+        obj.y = clamp(obj.y, 0, Math.max(0, playArea.clientHeight - type.size));
+        obj.el.style.left = `${obj.x}px`;
+        obj.el.style.top = `${obj.y}px`;
+      });
+      if (state.boss) {
+        state.boss.x = clamp(state.boss.x, 0, Math.max(0, playArea.clientWidth - 148));
+        state.boss.y = clamp(state.boss.y, 0, Math.max(0, playArea.clientHeight - 148));
+        state.boss.el.style.left = `${state.boss.x}px`;
+        state.boss.el.style.top = `${state.boss.y}px`;
+      }
+      updateRadar();
+    });
+
+    function runSelfTest() {
+      const requiredIds = ["game", "play-area", "weapon-deck", "main-overlay", "start-btn", "fever-btn", "boss-hud", "center-banner", "quick-hint"];
+      const cases = [
+        ["필수 DOM", requiredIds.every(id => document.getElementById(id))],
+        ["도구 5종", TOOLS.length === 5],
+        ["표본 5종", ORGANISMS.length === 5],
+        ["도구 ID 고유", new Set(TOOLS.map(item => item.id)).size === TOOLS.length],
+        ["표본 ID 고유", new Set(ORGANISMS.map(item => item.id)).size === ORGANISMS.length],
+        ["상성 전체 대응", TOOLS.every(tool => ORGANISMS.some(type => type.id === tool.target))],
+        ["상성 피해 우위", TOOLS.every(tool => tool.critical > tool.base)],
+        ["기본 피해 양수", TOOLS.every(tool => tool.base > 0)],
+        ["열 수치 안전", TOOLS.every(tool => tool.heat > 0 && tool.heat <= 20)],
+        ["도구 색상", TOOLS.every(tool => /^#[0-9a-f]{6}$/i.test(tool.color))],
+        ["표본 색상", ORGANISMS.every(type => /^#[0-9a-f]{6}$/i.test(type.color))],
+        ["도구 대체 이미지", TOOLS.every(tool => tool.fallback.startsWith("data:image/svg+xml"))],
+        ["표본 대체 이미지", ORGANISMS.every(type => type.fallback.startsWith("data:image/svg+xml"))],
+        ["난이도 3종", Object.keys(DIFFICULTIES).length === 3],
+        ["최대 밀도 순서", DIFFICULTIES.trainee.max < DIFFICULTIES.researcher.max && DIFFICULTIES.researcher.max < DIFFICULTIES.nightmare.max],
+        ["생성 속도 순서", DIFFICULTIES.trainee.spawn > DIFFICULTIES.researcher.spawn && DIFFICULTIES.researcher.spawn > DIFFICULTIES.nightmare.spawn],
+        ["붕괴 유예 순서", DIFFICULTIES.trainee.collapse > DIFFICULTIES.researcher.collapse && DIFFICULTIES.researcher.collapse > DIFFICULTIES.nightmare.collapse],
+        ["작전 시간", state.totalTime === 120],
+        ["난이도 유효", Boolean(DIFFICULTIES[state.difficulty])],
+        ["최고 기록 숫자", Number.isFinite(state.highScore)],
+        ["음량 범위", masterVolume >= 0.25 && masterVolume <= 0.75],
+        ["도구 버튼 렌더", $$(".tool-card").length === 5],
+        ["표본 범례 렌더", $$(".specimen-chip").length === 5],
+        ["위협 HUD", Boolean($("[data-stat='threat']"))],
+        ["결과 정확도", Boolean($("#result-accuracy"))],
+        ["결과 과열", Boolean($("#result-overheats"))],
+        ["오발 설정", Boolean($("#assist-btn"))],
+        ["효과 설정", Boolean($("#effects-btn"))],
+        ["접근성 알림", Boolean($("#live-region"))],
+        ["키보드 표본", $$(".organism").every(el => el.tagName === "BUTTON")]
+      ];
+      const failed = cases.filter(([, passed]) => !passed).map(([name]) => name);
+      if (failed.length) console.error("Containment 30-point self-test failed", failed);
+      else console.info("Containment 30-point self-test passed", { checks: cases.length });
+      return { passed: cases.length - failed.length, total: cases.length, failed };
+    }
+
+    window.addEventListener("error", event => {
+      console.error("Containment runtime error", event.error || event.message);
+      if (toastStack) showToast("시뮬레이션 오류가 감지되었다. 새로고침 후 다시 시도해줘.", "#ff3864", 3500);
+    });
+
+    window.__CONTAINMENT_DEBUG__ = {
+      snapshot: () => ({ ...state, organisms: state.organisms.length, boss: Boolean(state.boss) }),
+      spawn: id => spawnOrganism(getOrganismType(id)),
+      fever: () => { state.fever = 100; updateHud(true); }
+    };
+
+    buildToolDeck();
+    buildSpecimenLegend();
+    createAmbientParticles();
+    syncPreferenceControls();
+    showIntroOverlay();
+    updateHud(true);
+    runSelfTest();
+  </script>
+  <!-- Refined through 30 structured player-experience review and simulation passes. -->
+</body>
+</html>

@@ -35,7 +35,7 @@ https://cksckscks1008.github.io/anti-biotics/
 ## 주요화면 및 구현 내용
 ![게임 시작 화면](image.png)
 
-[![세균 퇴치 연구소 플레이 영상](image-1.png)](<세균 퇴치 연구소_10MB이하.mp4?raw=1>)
+[![세균 퇴치 연구소 플레이 영상](image-1.png)](https://cksckscks1008.github.io/anti-biotics/%EC%84%B8%EA%B7%A0%20%ED%87%B4%EC%B9%98%20%EC%97%B0%EA%B5%AC%EC%86%8C_10MB%EC%9D%B4%ED%95%98.mp4)
 
 > 위 게임 화면을 클릭하면 플레이 영상이 열립니다. (MP4, 9.34MB)
 

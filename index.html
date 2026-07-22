@@ -107,11 +107,15 @@
     }
 
     #sound-toggle {
-      position: absolute; right: 25px; top: 32px; background: rgba(0, 255, 200, 0.1);
-      border: 1px solid #00ffc8; color: #00ffc8; padding: 10px 14px; border-radius: 8px;
-      cursor: pointer; font-family: inherit; font-size: 12px; transition: all 0.2s;
+      position: absolute; right: calc(var(--safe-right) + 25px); top: calc(var(--safe-top) + 32px); background: rgba(0, 255, 200, 0.1);
+      width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
+      border: 1px solid #00ffc8; color: #00ffc8; border-radius: 50%;
+      cursor: pointer; font-family: sans-serif; font-size: 20px; line-height: 1;
+      z-index: 20; transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
     }
     #sound-toggle:hover { background: rgba(0, 255, 200, 0.3); }
+    #sound-toggle:active { transform: scale(0.92); }
+    #sound-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
     /* 대시보드 */
     #status-area { position: relative; padding: 12px 30px 5px 30px; color: white; z-index: 5; }
@@ -300,9 +304,9 @@
 
     /* 반응형 배치 전용: 색상·문구·게임 요소는 변경하지 않는다. */
     @media (max-width: 900px) {
-      #top-bar { gap: 8px; padding-right: max(120px, var(--safe-right)); }
+      #top-bar { gap: 8px; padding-right: calc(var(--safe-right) + 64px); }
       .weapon { width: 82px; }
-      #sound-toggle { right: max(10px, var(--safe-right)); }
+      #sound-toggle { right: calc(var(--safe-right) + 10px); }
       #status-area { padding-inline: max(14px, var(--safe-left)); }
       .stat-card { min-width: 94px; padding-inline: 9px; }
       #boss-bar-container { width: min(420px, calc(100% - 24px - var(--safe-left) - var(--safe-right))); }
@@ -317,13 +321,13 @@
       #top-bar {
         align-items: flex-end;
         gap: 4px;
-        padding: calc(var(--safe-top) + 28px) max(5px, var(--safe-right)) 4px max(5px, var(--safe-left));
+        padding: calc(var(--safe-top) + 42px) calc(var(--safe-right) + 5px) 4px calc(var(--safe-left) + 5px);
       }
       .weapon {
         flex: 1 1 0;
         width: auto;
         min-width: 0;
-        height: 66px;
+        height: 52px;
         padding-bottom: 4px;
         border-radius: 7px;
       }
@@ -332,10 +336,11 @@
       .weapon .name { width: 100%; padding-inline: 2px; font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .target-bug { top: 4px; right: 4px; width: 16px; height: 16px; }
       #sound-toggle {
-        top: calc(var(--safe-top) + 4px);
-        right: max(5px, var(--safe-right));
-        padding: 5px 7px;
-        font-size: 8px;
+        top: calc(var(--safe-top) + 3px);
+        right: calc(var(--safe-right) + 6px);
+        width: 36px;
+        height: 36px;
+        font-size: 17px;
       }
 
       #status-area { padding: 4px max(6px, var(--safe-right)) 3px max(6px, var(--safe-left)); }
@@ -382,12 +387,13 @@
         --top-bar-height: 94px;
         --play-top: 194px;
       }
-      #top-bar { padding-top: calc(var(--safe-top) + 27px); }
-      .weapon { height: 61px; }
+      #top-bar { padding-top: calc(var(--safe-top) + 40px); }
+      .weapon { height: 48px; }
       .weapon-icon { width: 27px; height: 27px; }
       .weapon .name { font-size: 6px; }
       .stat-card .value { font-size: 10px; }
       #fever-btn { font-size: 7px; }
+      #sound-toggle { top: calc(var(--safe-top) + 3px); width: 34px; height: 34px; font-size: 16px; }
     }
 
     @media (max-height: 520px) and (max-width: 950px) {
@@ -399,14 +405,14 @@
       #top-bar {
         align-items: center;
         gap: 5px;
-        padding: var(--safe-top) max(105px, var(--safe-right)) 0 max(8px, var(--safe-left));
+        padding: var(--safe-top) calc(var(--safe-right) + 52px) 0 calc(var(--safe-left) + 8px);
       }
       .weapon { flex: 0 1 78px; width: 78px; height: 56px; padding-bottom: 3px; }
       .weapon-icon { width: 28px; height: 28px; margin-bottom: 1px; }
       .weapon .num { top: 3px; left: 5px; font-size: 8px; }
       .weapon .name { font-size: 7px; }
       .target-bug { top: 3px; right: 3px; width: 15px; height: 15px; }
-      #sound-toggle { top: calc(var(--safe-top) + 5px); right: max(7px, var(--safe-right)); padding: 5px 7px; font-size: 8px; }
+      #sound-toggle { top: calc(var(--safe-top) + 3px); right: calc(var(--safe-right) + 7px); width: 36px; height: 36px; font-size: 17px; }
 
       #status-area { padding: 3px max(8px, var(--safe-right)) 2px max(8px, var(--safe-left)); }
       .progress-track { width: 45%; height: 5px; }
@@ -467,7 +473,7 @@
         <span class="num">5</span><span class="name">열 집합</span>
       </div>
 
-      <button id="sound-toggle" onclick="toggleAudio()">🎵 SOUND ON</button>
+      <button id="sound-toggle" type="button" onclick="toggleAudio()" aria-label="소리 끄기" aria-pressed="false" title="소리 끄기">🔊</button>
     </div>
 
     <div id="status-area">
@@ -570,8 +576,12 @@
       isAudioMuted = !isAudioMuted;
       bgmAudio.muted = isAudioMuted;
 
-      document.getElementById("sound-toggle").innerText =
-        isAudioMuted ? "🔇 SOUND OFF" : "🎵 SOUND ON";
+      const soundButton = document.getElementById("sound-toggle");
+      soundButton.textContent = isAudioMuted ? "🔇" : "🔊";
+      const soundButtonLabel = isAudioMuted ? "소리 켜기" : "소리 끄기";
+      soundButton.setAttribute("aria-label", soundButtonLabel);
+      soundButton.setAttribute("title", soundButtonLabel);
+      soundButton.setAttribute("aria-pressed", String(isAudioMuted));
 
       if (!isAudioMuted && !isGameOver && !isPaused) {
         await startBGM(false);
